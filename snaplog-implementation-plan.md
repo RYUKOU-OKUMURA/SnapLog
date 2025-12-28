@@ -35,27 +35,27 @@
 
 ### 1.1 設定・ロギング基盤
 
-- [ ] `src/config.py` を実装（YAML読み込み、デフォルト値、パス展開 `~`、バリデーション）
-- [ ] `src/logging.py`（または `src/main.py` 内）にロガー初期化を実装（ファイル＋標準出力）
-- [ ] `storage.cleanup_on_start=true` のときに起動時クリーンアップが走るようにする
+- [x] `src/config.py` を実装（YAML読み込み、デフォルト値、パス展開 `~`、バリデーション）
+- [x] `src/logging.py`（または `src/main.py` 内）にロガー初期化を実装（ファイル＋標準出力）
+- [x] `storage.cleanup_on_start=true` のときに起動時クリーンアップが走るようにする
 
 ### 1.2 キャプチャ（fullscreen）
 
-- [ ] `src/capture.py` を実装（`capture.mode=fullscreen` の `screencapture -x`）
-- [ ] 一時ファイル名の規約を確定（衝突しない・後始末できる）
-- [ ] キャプチャ失敗時の挙動を実装（ログ出力して次ループ）
+- [x] `src/capture.py` を実装（`capture.mode=fullscreen` の `screencapture -x`）
+- [x] 一時ファイル名の規約を確定（衝突しない・後始末できる）
+- [x] キャプチャ失敗時の挙動を実装（ログ出力して次ループ）
 
 ### 1.3 アクティブウィンドウ情報取得
 
-- [ ] `src/window_info.py`（または `capture.py`）でアクティブアプリ名取得（`osascript`）
-- [ ] ウィンドウタイトル取得（失敗時は空文字にフォールバック）
-- [ ] 取得に必要な権限エラーの検出とメッセージを整備
+- [x] `src/window_info.py`（または `capture.py`）でアクティブアプリ名取得（`osascript`）
+- [x] ウィンドウタイトル取得（失敗時は空文字にフォールバック）
+- [x] 取得に必要な権限エラーの検出とメッセージを整備
 
 ### 1.4 OCR（Vision Framework）
 
-- [ ] `src/ocr.py` を実装（Vision + Quartzで画像読み込み→テキスト抽出）
-- [ ] 言語設定（`ja-JP` `en-US`）を設定に追従できるようにする（将来拡張でもよい）
-- [ ] OCR失敗時の挙動を実装（ログ出力して破棄）
+- [x] `src/ocr.py` を実装（Vision + Quartzで画像読み込み→テキスト抽出）
+- [x] 言語設定（`ja-JP` `en-US`）を設定に追従できるようにする（将来拡張でもよい）
+- [x] OCR失敗時の挙動を実装（ログ出力して破棄）
 
 ### 1.5 フィルタ（除外）
 
@@ -67,8 +67,8 @@
 
 - [ ] `src/storage.py` を実装（JSONL追記、日付別ファイル、UTF-8、LF）
 - [ ] ログエントリのフィールドを揃える（`timestamp` `app_name` `window_title` `ocr_text` `ocr_length`）
-- [ ] ディレクトリ自動作成（`~/Documents/SnapLog/logs`）
-- [ ] 保持期間（`retention_days`）に従った削除を実装（ログ/レポート）
+- [x] ディレクトリ自動作成（`~/Documents/SnapLog/logs`）
+- [x] 保持期間（`retention_days`）に従った削除を実装（ログ/レポート）
 
 ### 1.7 メインループ統合
 
