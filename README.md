@@ -10,6 +10,10 @@
 
 ---
 
+## 🚧 ステータス
+
+このリポジトリは **仕様・設計の整備が先行** しています（実装はこれから更新していきます）。
+
 ## ✨ 特徴
 
 - **完全ローカル動作** - 外部APIへの送信なし、課金なし
@@ -42,12 +46,14 @@
 
 ## 🚀 クイックスタート
 
+※ 現状は設計段階のため、手順・コマンドは実装に合わせて更新予定です。
+
 ### 1. インストール
 
 ```bash
 # リポジトリをクローン
-git clone https://github.com/yourusername/snaplog.git
-cd snaplog
+git clone <repository-url>
+cd SnapLog
 
 # 仮想環境を作成
 python3 -m venv venv
@@ -107,6 +113,7 @@ python src/report.py --date 2025-01-15
 # キャプチャ間隔（秒）
 capture:
   interval: 60
+  mode: "fullscreen"
 
 # 除外するアプリ
 filter:
@@ -123,16 +130,20 @@ filter:
 llm:
   endpoint: "http://localhost:1234/v1/chat/completions"
   model: "llama3.2"
+
+# 保存ポリシー（推奨）
+storage:
+  retention_days: 14
 ```
 
-詳細は [設定リファレンス](docs/configuration.md) を参照してください。
+詳細は `snaplog-architecture.md` の「settings.yaml」を参照してください。
 
 ---
 
 ## 📁 ディレクトリ構成
 
 ```
-snaplog/
+SnapLog/
 ├── src/
 │   ├── main.py           # エントリーポイント
 │   ├── capture.py        # スクリーンキャプチャ
@@ -212,26 +223,28 @@ SnapLogはプライバシーを重視して設計されています：
 - **画像即削除** - スクリーンショットはOCR後に即削除
 - **除外機能** - パスワードマネージャー、銀行サイト等を自動除外
 - **パターンマッチ** - クレカ番号、電話番号等をOCR結果から検出して除外
+- **注意（MVPのキャプチャ範囲）** - `capture.mode=fullscreen` の場合、背面ウィンドウの情報が混入し得ます（将来的に `active_window` を追加予定）
 
 ---
 
 ## 🗺️ ロードマップ
 
-- [x] Phase 1: 素材収集（MVP）
-  - [x] スクリーンキャプチャ
-  - [x] Vision Framework OCR
-  - [x] JSONL保存
-  - [x] アプリ名による除外
+- [ ] Phase 1: 素材収集（MVP）
+  - [ ] スクリーンキャプチャ（デフォルト: fullscreen）
+  - [ ] アクティブウィンドウ情報取得
+  - [ ] Vision Framework OCR
+  - [ ] JSONL保存
+  - [ ] 基本フィルタ（アプリ名/タイトル/パターン）
 
 - [ ] Phase 2: 日報生成
-  - [ ] ローカルLLM連携
-  - [ ] 日報テンプレート
-  - [ ] Markdown出力
+  - [ ] ログ前処理（グルーピング/圧縮/分割）
+  - [ ] ローカルLLM連携（OpenAI互換エンドポイント）
+  - [ ] 日報テンプレート/Markdown出力
 
 - [ ] Phase 3: 改善
-  - [ ] ウィンドウタイトルによる除外
-  - [ ] OCRパターンによる除外
-  - [ ] メニューバーUI
+  - [ ] キャプチャ範囲の改善（active_window等）
+  - [ ] メニューバーUI（停止/一時停止/状態表示）
+  - [ ] フィルタ強化（許可リスト運用、精度改善）
 
 ---
 
@@ -259,7 +272,7 @@ SnapLogはプライバシーを重視して設計されています：
 Error: Screen capture failed
 ```
 
-→ システム設定 > プライバシー > 画面収録 でTerminalを許可してください
+→ システム設定 > プライバシーとセキュリティ > 画面収録 で実行アプリ（Terminal等）を許可してください
 
 ### OCRが動作しない
 
@@ -277,11 +290,15 @@ Error: Connection refused to localhost:1234
 
 → LM StudioまたはOllamaが起動しているか確認してください
 
+### launchd等の自動起動で権限が効かない
+
+→ 画面収録/アクセシビリティは「どのアプリから実行したか」に依存します。Terminalで許可しても、launchd配下の実行では別扱いになる場合があります。まずは `./scripts/start.sh`（Terminal起動）で動作確認し、安定した自動起動は `snaplog-architecture.md` の起動・停止方針に従ってください。
+
 ---
 
 ## 🤝 コントリビューション
 
-バグ報告や機能リクエストは [Issues](https://github.com/yourusername/snaplog/issues) へお願いします。
+バグ報告や機能リクエストはリポジトリのIssuesへお願いします。
 
 ---
 
@@ -293,7 +310,7 @@ MIT License
 
 ## 🙏 謝辞
 
-このツールは、Xで見かけた[@username](https://x.com/username)さんのアイデアにインスパイアされて作成しました。
+このツールは、日々の作業振り返りを楽にしたいというニーズから着想しています。
 
 ---
 

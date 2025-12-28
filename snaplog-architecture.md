@@ -91,7 +91,7 @@
 ### 2.1 プロジェクト構造
 
 ```
-snaplog/
+SnapLog/
 ├── src/
 │   ├── __init__.py
 │   ├── main.py                 # エントリーポイント
@@ -207,6 +207,7 @@ class CaptureModule:
     def take_screenshot() -> str:
         """
         スクリーンショットを撮影
+        （`settings.yaml` の `capture.mode` に従って fullscreen / active_window を切り替える想定）
         
         Returns:
             str: 一時保存した画像のパス（/tmp/screenshot_xxx.png）
@@ -341,6 +342,12 @@ class StorageModule:
         指定日のログを取得
         """
         pass
+
+    def cleanup_old_files(retention_days: int) -> None:
+        """
+        古いログ/レポートを削除（リテンション）
+        """
+        pass
 ```
 
 **JSONLレコード構造**
@@ -366,12 +373,18 @@ class StorageModule:
 @dataclass
 class Config:
     interval: int                    # キャプチャ間隔（秒）
+    capture_mode: str                # キャプチャ方式（fullscreen / active_window）
+    temp_dir: str                    # 一時ファイル保存先
     log_dir: str                     # ログ保存先
     report_dir: str                  # レポート保存先
+    retention_days: int              # 保持日数（ログ/レポート）
     exclude_apps: list[str]          # 除外アプリ
     exclude_title_keywords: list[str] # 除外タイトルキーワード
     exclude_patterns: list[str]      # 除外正規表現
     llm_endpoint: str                # LLMのエンドポイント
+    llm_model: str                   # LLMモデル名
+    report_group_gap_minutes: int    # セッション分割の閾値
+    report_chunk_chars: int          # LLM投入用の分割サイズ
 
 def load_config(path: str = None) -> Config:
     """設定ファイルを読み込み"""
@@ -382,6 +395,7 @@ def load_config(path: str = None) -> Config:
 
 **責務**
 - ログの読み込みと整形
+- 入力のグルーピング/分割/圧縮（LLM投入サイズの制御）
 - ローカルLLMへのリクエスト
 - Markdown日報の生成・保存
 
@@ -422,6 +436,7 @@ class ReportModule:
 # ===== 基本設定 =====
 capture:
   interval: 60                    # キャプチャ間隔（秒）
+  mode: "fullscreen"              # fullscreen（MVP） / active_window（拡張）
   temp_dir: "/tmp"                # 一時ファイル保存先
 
 # ===== 保存先 =====
@@ -429,6 +444,8 @@ storage:
   base_dir: "~/Documents/SnapLog"
   log_subdir: "logs"
   report_subdir: "reports"
+  retention_days: 14              # 保持日数
+  cleanup_on_start: true          # 起動時に古いファイルを削除
 
 # ===== 除外設定 =====
 filter:
@@ -465,9 +482,14 @@ llm:
   # LM Studioの場合
   endpoint: "http://localhost:1234/v1/chat/completions"
   # Ollamaの場合
-  # endpoint: "http://localhost:11434/api/generate"
+  # endpoint: "http://localhost:11434/v1/chat/completions"
   model: "llama3.2"
   max_tokens: 2000
+
+# ===== 日報生成（Phase 2）=====
+report:
+  group_gap_minutes: 10           # 10分以上の空きでセッション分割
+  chunk_chars: 12000              # LLM投入用の分割（概算）
 
 # ===== ログ設定 =====
 logging:
@@ -524,12 +546,15 @@ Content-Type: application/json
 
 **Ollama**
 ```
-POST http://localhost:11434/api/generate
+POST http://localhost:11434/v1/chat/completions
 Content-Type: application/json
 
 {
   "model": "llama3.2",
-  "prompt": "以下のログから日報を作成してください:\n..."
+  "messages": [
+    {"role": "system", "content": "あなたは日報作成アシスタントです。"},
+    {"role": "user", "content": "以下のログから日報を作成してください:\n..."}
+  ]
 }
 ```
 
@@ -593,6 +618,8 @@ fi
 
 ### 7.3 launchd（自動起動）- オプション
 
+> 注意: 画面収録/アクセシビリティは「どのアプリとして実行したか」に依存します。Terminalで許可しても、launchd配下の実行で権限が再度必要になる場合があります。まずは `start.sh` で動作確認し、安定運用はログイン項目（ラッパーApp等）を推奨します。
+
 ```xml
 <!-- ~/Library/LaunchAgents/com.user.snaplog.plist -->
 <?xml version="1.0" encoding="UTF-8"?>
@@ -605,7 +632,7 @@ fi
     <key>ProgramArguments</key>
     <array>
         <string>/usr/bin/python3</string>
-        <string>/path/to/snaplog/src/main.py</string>
+        <string>/path/to/SnapLog/src/main.py</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
@@ -627,14 +654,15 @@ fi
 
 | 権限 | 必要性 | 設定場所 |
 |------|--------|---------|
-| 画面収録 | 必須 | システム設定 > プライバシー > 画面収録 |
-| アクセシビリティ | 必須 | システム設定 > プライバシー > アクセシビリティ |
+| 画面収録 | 必須 | システム設定 > プライバシーとセキュリティ > 画面収録 |
+| アクセシビリティ | 必須 | システム設定 > プライバシーとセキュリティ > アクセシビリティ |
 
 ### 8.2 データ保護
 
 - ログファイルはユーザーディレクトリに保存（他ユーザーからアクセス不可）
 - 一時ファイルは即削除
 - 機密情報は除外フィルタで保護
+- `capture.mode=fullscreen` の場合、背面ウィンドウの情報が混入し得るため、運用での注意（許可リスト/一時停止）と将来的な `active_window` 対応で軽減する
 
 ---
 

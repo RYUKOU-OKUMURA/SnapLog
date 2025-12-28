@@ -237,6 +237,11 @@ result = response.json()
 | -R <x,y,w,h> | 指定領域のみ撮影 |
 | -D <番号> | 特定ディスプレイのみ |
 
+**capture.mode との関係（設計）**
+
+- `fullscreen`（MVP）: `screencapture -x` で画面全体を撮影してOCR→即削除
+- `active_window`（拡張）: Quartzで前面ウィンドウID/座標を取得し、`-l <windowid>` や `-R <x,y,w,h>`（クロップ）で前面ウィンドウのみを撮影して、背面ウィンドウの混入リスクを下げる
+
 **使用例**
 ```python
 import subprocess
@@ -444,7 +449,7 @@ ollama list
 ollama run llama3.2
 ```
 
-**API仕様**
+**API仕様（独自）**
 
 ```
 エンドポイント: POST http://localhost:11434/api/generate
@@ -476,14 +481,16 @@ import requests
 
 def call_ollama(prompt: str) -> str:
     response = requests.post(
-        "http://localhost:11434/api/generate",
+        "http://localhost:11434/v1/chat/completions",
         json={
             "model": "llama3.2",
-            "prompt": prompt,
-            "stream": False
-        }
+            "messages": [
+                {"role": "system", "content": "あなたは日報作成アシスタントです。"},
+                {"role": "user", "content": prompt},
+            ],
+        },
     )
-    return response.json()["response"]
+    return response.json()["choices"][0]["message"]["content"]
 
 # または公式ライブラリ
 # pip install ollama
@@ -660,6 +667,9 @@ kill $(cat .pid)
 ```
 
 **方法3: launchd（自動起動）**
+
+> 注意: 画面収録/アクセシビリティは「どのアプリとして実行したか」に依存します。Terminalで許可しても、launchd配下の実行で権限が再度必要になる場合があります。安定運用の方針は `snaplog-architecture.md` を参照してください。
+
 ```bash
 # plistを配置
 cp com.user.snaplog.plist ~/Library/LaunchAgents/
@@ -711,7 +721,7 @@ reports/
 ```bash
 # 1. リポジトリクローン
 git clone <repository-url>
-cd snaplog
+cd SnapLog
 
 # 2. Python仮想環境作成
 python3 -m venv venv
@@ -725,8 +735,8 @@ cp config/settings.yaml.example config/settings.yaml
 # 必要に応じて編集
 
 # 5. macOS権限設定
-# システム設定 > プライバシー > 画面収録 でTerminalを許可
-# システム設定 > プライバシー > アクセシビリティ でTerminalを許可
+# システム設定 > プライバシーとセキュリティ > 画面収録 で実行アプリを許可
+# システム設定 > プライバシーとセキュリティ > アクセシビリティ で実行アプリを許可
 
 # 6. 動作確認
 python src/main.py
