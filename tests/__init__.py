@@ -1,0 +1,2 @@
+# SnapLog tests package
+

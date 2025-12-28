@@ -17,14 +17,14 @@
 - [x] 日報生成の前処理（グルーピング/分割/圧縮）方針を明文化
 - [x] launchd運用時の権限注意点を明文化
 
-- [ ] リポジトリ構成を作成（`src/` `config/` `scripts/` `tests/`）
-- [ ] `requirements.txt` を作成（少なくとも `pyobjc-framework-Vision` `pyobjc-framework-Quartz` `PyYAML`、Phase 2で `requests`）
-- [ ] `config/settings.yaml.example` を作成（`snaplog-architecture.md` のスキーマ準拠）
-- [ ] `scripts/start.sh` / `scripts/stop.sh` / `scripts/generate_report.sh` を作成（実行権限も付与）
-- [ ] `.gitignore` を作成（`.pid` `*.log` `~/Documents/SnapLog` 相当の生成物を除外）
-- [ ] ログ保存先とレポート保存先のパス仕様を確定（`~/Documents/SnapLog/` 基準で統一）
-- [ ] エラーハンドリング方針を確定（「継続する/停止する」の境界を明文化）
-- [ ] ログスキーマ（JSONL）を確定（必須/任意フィールド、バージョン）
+- [x] リポジトリ構成を作成（`src/` `config/` `scripts/` `tests/`）
+- [x] `requirements.txt` を作成（少なくとも `pyobjc-framework-Vision` `pyobjc-framework-Quartz` `PyYAML`、Phase 2で `requests`）
+- [x] `config/settings.yaml.example` を作成（`snaplog-architecture.md` のスキーマ準拠）
+- [x] `scripts/start.sh` / `scripts/stop.sh` / `scripts/generate_report.sh` を作成（実行権限も付与）
+- [x] `.gitignore` を作成（`.pid` `*.log` `~/Documents/SnapLog` 相当の生成物を除外）
+- [x] ログ保存先とレポート保存先のパス仕様を確定（`~/Documents/SnapLog/` 基準で統一）
+- [x] エラーハンドリング方針を確定（「継続する/停止する」の境界を明文化）
+- [x] ログスキーマ（JSONL）を確定（必須/任意フィールド、バージョン）
 
 **Done（受け入れ条件）**
 - [ ] ローカルで `python src/main.py` が起動でき、設定ファイル読み込みまで到達する（処理本体は未実装でもよい）

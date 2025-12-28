@@ -1,0 +1,17 @@
+# SnapLog dependencies
+
+# macOS Vision Framework (OCR)
+pyobjc-framework-Vision>=10.0
+
+# macOS Quartz Framework (画像処理)
+pyobjc-framework-Quartz>=10.0
+
+# pyobjc core
+pyobjc-core>=10.0
+
+# YAML設定ファイル
+PyYAML>=6.0
+
+# HTTPリクエスト（Phase 2: LLM連携用）
+requests>=2.31.0
+

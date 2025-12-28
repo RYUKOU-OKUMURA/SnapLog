@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+env/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# プロジェクト固有
+.pid
+*.log
+logs/
+reports/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# 一時ファイル
+/tmp/
+*.png
+*.jpg
+*.jpeg
+

@@ -1,0 +1,2 @@
+# SnapLog source package
+
