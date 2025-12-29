@@ -59,29 +59,29 @@
 
 ### 1.5 フィルタ（除外）
 
-- [ ] `src/filter.py` を実装（事前: アプリ名/タイトル、事後: OCR正規表現）
-- [ ] 除外時の挙動を実装（ログに「除外理由」を残すかどうかを決めて実装）
-- [ ] 正規表現のプリコンパイルとエラーハンドリング（壊れたregexで落ちない）
+- [x] `src/filter.py` を実装（事前: アプリ名/タイトル、事後: OCR正規表現）
+- [x] 除外時の挙動を実装（ログに「除外理由」を残すかどうかを決めて実装）
+- [x] 正規表現のプリコンパイルとエラーハンドリング（壊れたregexで落ちない）
 
 ### 1.6 保存（JSONL）
 
-- [ ] `src/storage.py` を実装（JSONL追記、日付別ファイル、UTF-8、LF）
-- [ ] ログエントリのフィールドを揃える（`timestamp` `app_name` `window_title` `ocr_text` `ocr_length`）
+- [x] `src/storage.py` を実装（JSONL追記、日付別ファイル、UTF-8、LF）
+- [x] ログエントリのフィールドを揃える（`timestamp` `app_name` `window_title` `ocr_text` `ocr_length`）
 - [x] ディレクトリ自動作成（`~/Documents/SnapLog/logs`）
 - [x] 保持期間（`retention_days`）に従った削除を実装（ログ/レポート）
 
 ### 1.7 メインループ統合
 
-- [ ] `src/main.py` を実装（処理フローどおりに結線、例外で落ちない）
-- [ ] `capture.interval` に従ってスリープ（例外時も次ループへ）
-- [ ] SIGINT（Ctrl+C）で安全に終了できるようにする
+- [x] `src/main.py` を実装（処理フローどおりに結線、例外で落ちない）
+- [x] `capture.interval` に従ってスリープ（例外時も次ループへ）
+- [x] SIGINT（Ctrl+C）で安全に終了できるようにする
 
 ### 1.8 テスト（最低限）
 
-- [ ] `tests/test_config.py`（設定の読み込み/デフォルト/バリデーション）
-- [ ] `tests/test_filter.py`（除外判定の単体テスト）
-- [ ] `tests/test_storage.py`（JSONL追記、パス生成、リテンション）
-- [ ] macOS依存部分はモック/DIでテスト可能にする（`subprocess` の差し替え等）
+- [x] `tests/test_config.py`（設定の読み込み/デフォルト/バリデーション）
+- [x] `tests/test_filter.py`（除外判定の単体テスト）
+- [x] `tests/test_storage.py`（JSONL追記、パス生成、リテンション）
+- [x] macOS依存部分はモック/DIでテスト可能にする（`subprocess` の差し替え等）
 
 **Done（受け入れ条件）**
 - [ ] 1分間隔で「キャプチャ→OCR→フィルタ→JSONL追記→画像削除」が回る
@@ -94,33 +94,33 @@
 
 ### 2.1 ログ読み込み・前処理（入力圧縮）
 
-- [ ] `src/report_preprocess.py` を実装（ログ読み込み→整形）
-- [ ] セッション分割（`report.group_gap_minutes`）を実装
-- [ ] グルーピング（例: アプリ/ウィンドウ/時間帯）を実装
-- [ ] チャンク分割（`report.chunk_chars`）を実装（LLM投入上限対策）
-- [ ] 個人情報っぽいパターンの追加マスキング（任意、要件に合わせて）
+- [x] `src/report_preprocess.py` を実装（ログ読み込み→整形）
+- [x] セッション分割（`report.group_gap_minutes`）を実装
+- [x] グルーピング（例: アプリ/ウィンドウ/時間帯）を実装
+- [x] チャンク分割（`report.chunk_chars`）を実装（LLM投入上限対策）
+- [x] 個人情報っぽいパターンの追加マスキング（任意、要件に合わせて）
 
 ### 2.2 LLMクライアント（OpenAI互換）
 
-- [ ] `src/llm_client.py` を実装（`/v1/chat/completions` 前提）
-- [ ] タイムアウト/リトライ/エラーメッセージを実装
-- [ ] モデル名（`llm.model`）と `max_tokens` を設定から反映
+- [x] `src/llm_client.py` を実装（`/v1/chat/completions` 前提）
+- [x] タイムアウト/リトライ/エラーメッセージを実装
+- [x] モデル名（`llm.model`）と `max_tokens` を設定から反映
 
 ### 2.3 日報テンプレート・Markdown出力
 
-- [ ] 日報の固定テンプレートを確定（見出し構成、箇条書き、所感、課題、明日の予定など）
-- [ ] `src/report.py` を実装（`--date` 指定、出力先 `~/Documents/SnapLog/reports/`）
-- [ ] 大量ログ時に「分割生成→結合」できるようにする
+- [x] 日報の固定テンプレートを確定（見出し構成、箇条書き、所感、課題、明日の予定など）
+- [x] `src/report.py` を実装（`--date` 指定、出力先 `~/Documents/SnapLog/reports/`）
+- [x] 大量ログ時に「分割生成→結合」できるようにする
 
 ### 2.4 スクリプト/UX
 
-- [ ] `scripts/generate_report.sh` を実装（今日/指定日）
-- [ ] 失敗時に「LLMが起動していない」など原因が分かるメッセージにする
+- [x] `scripts/generate_report.sh` を実装（今日/指定日）
+- [x] 失敗時に「LLMが起動していない」など原因が分かるメッセージにする
 
 ### 2.5 テスト（最低限）
 
-- [ ] `tests/test_report_preprocess.py`（グルーピング/分割/チャンク）
-- [ ] `tests/test_llm_client.py`（HTTP部分はモック）
+- [x] `tests/test_report_preprocess.py`（グルーピング/分割/チャンク）
+- [x] `tests/test_llm_client.py`（HTTP部分はモック）
 
 **Done（受け入れ条件）**
 - [ ] `python src/report.py` で当日分のMarkdown日報が生成される
@@ -132,28 +132,28 @@
 
 ### 3.1 キャプチャ範囲改善（active_window）
 
-- [ ] `capture.mode=active_window` を実装（前面ウィンドウのみ撮影）
-- [ ] 複数モニター環境での挙動を定義し実装（メイン/全画面/前面ウィンドウ優先）
-- [ ] `fullscreen` と `active_window` の切り替えを設定で可能にする
+- [x] `capture.mode=active_window` を実装（前面ウィンドウのみ撮影）
+- [x] 複数モニター環境での挙動を定義し実装（メイン/全画面/前面ウィンドウ優先）
+- [x] `fullscreen` と `active_window` の切り替えを設定で可能にする
 
 ### 3.2 プライバシー強化
 
-- [ ] 許可リスト（allowlist）運用の追加（「このアプリだけ記録」モード）
-- [ ] 一時停止（pause）機能（ホットキー or CLIフラグ or UI）
-- [ ] 除外判定のログ（理由）を必要最小限で残す方針を確定し実装
+- [x] 許可リスト（allowlist）運用の追加（「このアプリだけ記録」モード）
+- [x] 一時停止（pause）機能（ホットキー or CLIフラグ or UI）
+- [x] 除外判定のログ（理由）を必要最小限で残す方針を確定し実装
 
 ### 3.3 常駐・起動体験
 
-- [ ] メニューバーUI（`rumps`）を実装（状態表示/停止/一時停止/手動日報生成）
-- [ ] 自動起動（launchd）用のテンプレートを整備（権限注意を明記）
+- [x] メニューバーUI（`rumps`）を実装（状態表示/停止/一時停止/手動日報生成）
+- [x] 自動起動（launchd）用のテンプレートを整備（権限注意を明記）
 
 ### 3.4 品質・配布
 
-- [ ] `ruff` / `pytest` 実行手順を整備（CIがあるならCIも追加）
-- [ ] バージョニング方針（alpha/beta）を決める
-- [ ] 配布手順（zip/Installer/簡易アプリ化）を決める
+- [x] `ruff` / `pytest` 実行手順を整備（CIがあるならCIも追加）
+- [x] バージョニング方針（alpha/beta）を決める
+- [x] 配布手順（zip/Installer/簡易アプリ化）を決める
 
 **Done（受け入れ条件）**
-- [ ] `active_window` で背面ウィンドウ混入リスクが実用上許容できる
-- [ ] 一時停止/再開が迷わず操作できる
+- [x] `active_window` で背面ウィンドウ混入リスクが実用上許容できる（ウィンドウID指定により前面ウィンドウのみキャプチャ）
+- [x] 一時停止/再開が迷わず操作できる（メニューバーUIから操作可能）
 

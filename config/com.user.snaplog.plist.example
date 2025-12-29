@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" 
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.user.snaplog</string>
+    
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/python3</string>
+        <string>/path/to/SnapLog/src/main.py</string>
+        <!-- メニューバーUIを使用する場合: -->
+        <!-- <string>--menu-bar</string> -->
+    </array>
+    
+    <key>RunAtLoad</key>
+    <true/>
+    
+    <key>KeepAlive</key>
+    <true/>
+    
+    <key>StandardOutPath</key>
+    <string>/tmp/snaplog.out</string>
+    
+    <key>StandardErrorPath</key>
+    <string>/tmp/snaplog.err</string>
+    
+    <key>WorkingDirectory</key>
+    <string>/path/to/SnapLog</string>
+    
+    <!-- 環境変数（必要に応じて） -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+</dict>
+</plist>
+
+<!--
+使用方法:
+1. このファイルを ~/Library/LaunchAgents/com.user.snaplog.plist にコピー
+2. ProgramArguments のパスを実際のパスに変更
+3. WorkingDirectory を実際のディレクトリに変更
+4. 以下のコマンドで読み込み:
+   launchctl load ~/Library/LaunchAgents/com.user.snaplog.plist
+
+注意事項:
+- 画面収録権限とアクセシビリティ権限が必要です
+- launchdで実行する場合、権限は「どのアプリとして実行したか」に依存します
+- Terminalで許可しても、launchd配下の実行で権限が再度必要になる場合があります
+- まずは start.sh で動作確認し、安定運用はログイン項目（ラッパーApp等）を推奨します
+-->
+

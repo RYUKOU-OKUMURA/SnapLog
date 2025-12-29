@@ -32,13 +32,20 @@ def generate_temp_filename(temp_dir: str, suffix: str = ".png") -> str:
     return filepath
 
 
-def take_screenshot(output_path: Optional[str] = None, temp_dir: str = "/tmp") -> Optional[str]:
+def take_screenshot(
+    output_path: Optional[str] = None,
+    temp_dir: str = "/tmp",
+    mode: str = "fullscreen",
+    window_id: Optional[int] = None
+) -> Optional[str]:
     """
-    スクリーンショットを撮影（フルスクリーン）
+    スクリーンショットを撮影
     
     Args:
         output_path: 出力先パス（Noneの場合は自動生成）
         temp_dir: 一時ディレクトリ（output_pathがNoneの場合に使用）
+        mode: キャプチャモード（"fullscreen" または "active_window"）
+        window_id: ウィンドウID（active_windowモードの場合に必要）
         
     Returns:
         Optional[str]: 保存された画像のパス（失敗時はNone）
@@ -47,9 +54,18 @@ def take_screenshot(output_path: Optional[str] = None, temp_dir: str = "/tmp") -
         output_path = generate_temp_filename(temp_dir)
     
     try:
-        # screencapture -x でフルスクリーンキャプチャ（撮影音無効化）
+        # キャプチャコマンドを構築
+        cmd = ["screencapture", "-x"]  # -x: 撮影音無効化
+        
+        if mode == "active_window" and window_id:
+            # アクティブウィンドウのみをキャプチャ（-l: ウィンドウID指定）
+            cmd.extend(["-l", str(window_id)])
+        # fullscreenモードの場合は追加オプションなし
+        
+        cmd.append(output_path)
+        
         result = subprocess.run(
-            ["screencapture", "-x", output_path],
+            cmd,
             capture_output=True,
             text=True,
             timeout=10
@@ -128,4 +144,5 @@ def delete_image(image_path: str) -> bool:
     except Exception as e:
         logger.warning(f"画像ファイル削除失敗: {image_path}, エラー: {e}")
         return False
+
 

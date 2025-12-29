@@ -1,4 +1,4 @@
 #!/bin/bash
 cd "$(dirname "$0")/.."
-python src/report.py "$@"
+python -m src.report "$@"
 

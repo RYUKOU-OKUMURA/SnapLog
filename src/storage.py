@@ -1,9 +1,12 @@
 """ストレージモジュール"""
+import json
 import logging
 import os
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Optional
+
+from .window_info import WindowInfo
 
 logger = logging.getLogger("snaplog.storage")
 
@@ -87,4 +90,56 @@ def ensure_directories(base_dir: str, log_subdir: str = "logs", report_subdir: s
     (base_path / report_subdir).mkdir(parents=True, exist_ok=True)
     
     logger.debug(f"ディレクトリを確認/作成しました: {base_dir}")
+
+
+def save_log(
+    window_info: WindowInfo,
+    ocr_text: str,
+    base_dir: str,
+    log_subdir: str = "logs"
+) -> None:
+    """
+    ログをJSONLファイルに保存
+    
+    Args:
+        window_info: ウィンドウ情報
+        ocr_text: OCRで抽出されたテキスト
+        base_dir: ベースディレクトリ
+        log_subdir: ログサブディレクトリ名
+    """
+    try:
+        # ディレクトリを確保
+        ensure_directories(base_dir, log_subdir)
+        
+        # タイムスタンプ生成（ISO 8601形式、タイムゾーン付き）
+        timestamp = datetime.now().astimezone().isoformat()
+        
+        # ログエントリ構造を作成
+        log_entry = {
+            "timestamp": timestamp,
+            "app_name": window_info.app_name,
+            "window_title": window_info.window_title,
+            "ocr_text": ocr_text,
+            "ocr_length": len(ocr_text)
+        }
+        
+        # 日付別ファイル名生成（activity_log_YYYY-MM-DD.jsonl）
+        today = datetime.now().strftime("%Y-%m-%d")
+        log_filename = f"activity_log_{today}.jsonl"
+        
+        # ログファイルのパス
+        log_dir = Path(base_dir) / log_subdir
+        log_file_path = log_dir / log_filename
+        
+        # JSONL追記（UTF-8、LF改行）
+        with open(log_file_path, "a", encoding="utf-8", newline="\n") as f:
+            json_line = json.dumps(log_entry, ensure_ascii=False)
+            f.write(json_line + "\n")
+        
+        logger.debug(f"ログを保存しました: {log_file_path}")
+        
+    except Exception as e:
+        logger.error(f"ログ保存中にエラーが発生しました: {e}")
+        raise
+
 

@@ -31,6 +31,10 @@ class FilterConfig:
     exclude_apps: List[str] = field(default_factory=list)
     exclude_title_keywords: List[str] = field(default_factory=list)
     exclude_patterns: List[str] = field(default_factory=list)
+    # 許可リスト（allowlist）: このリストが空でない場合、リストに含まれるアプリのみ記録
+    allow_apps: List[str] = field(default_factory=list)
+    # 除外判定のログを残すかどうか（プライバシー強化）
+    log_exclusion_reason: bool = False
 
 
 @dataclass
@@ -125,4 +129,5 @@ def load_config(config_path: Optional[str] = None) -> Config:
     config.validate()
     
     return config
+
 

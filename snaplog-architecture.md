@@ -228,7 +228,14 @@ get_active_window():
       └─ osascript -e 'tell application "System Events" to ...'
 
 take_screenshot():
-  └─ subprocess.run(["screencapture", "-x", path])
+  ├─ fullscreenモード: subprocess.run(["screencapture", "-x", path])
+  └─ active_windowモード: 
+      ├─ ウィンドウID取得（AppleScript）
+      └─ subprocess.run(["screencapture", "-x", "-l", window_id, path])
+  
+複数モニター環境での挙動:
+- fullscreenモード: メインディスプレイ全体をキャプチャ
+- active_windowモード: アクティブウィンドウが存在するディスプレイに関係なく、そのウィンドウのみをキャプチャ
 ```
 
 ### 3.3 ocr.py（OCRモジュール）
