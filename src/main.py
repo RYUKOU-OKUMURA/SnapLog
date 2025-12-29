@@ -84,155 +84,77 @@ def run_main_loop(cfg: config.Config):
         if paused:
             time.sleep(1)  # 1秒待機して再チェック
             continue
-        
+
+        skip = False
+        image_path = None
+
         try:
-        
-        # 起動時クリーンアップ
-        if cfg.storage.cleanup_on_start:
-            logger.info("起動時クリーンアップを実行します...")
-            storage.cleanup_old_files(
-                base_dir=cfg.storage.base_dir,
-                log_subdir=cfg.storage.log_subdir,
-                report_subdir=cfg.storage.report_subdir,
-                retention_days=cfg.storage.retention_days
-            )
-        
-        # ディレクトリ確保
-        storage.ensure_directories(
-            base_dir=cfg.storage.base_dir,
-            log_subdir=cfg.storage.log_subdir,
-            report_subdir=cfg.storage.report_subdir
-        )
-        
-        # シグナルハンドラ登録（SIGINT）
-        signal.signal(signal.SIGINT, signal_handler)
-        
-        logger.info(f"キャプチャ間隔: {cfg.capture.interval}秒")
-        logger.info(f"キャプチャモード: {cfg.capture.mode}")
-        logger.info(f"ログ保存先: {cfg.storage.base_dir}/{cfg.storage.log_subdir}")
-        
-        # メインループ
-        while running:
-            # 一時停止チェック
-            if paused:
-                time.sleep(1)  # 1秒待機して再チェック
-                continue
-            
-            try:
-                # 1. アクティブウィンドウ情報取得
+            # 1. アクティブウィンドウ情報取得
+            include_bounds = cfg.capture.mode == "active_window"
+            window = window_info.get_active_window(include_bounds=include_bounds)
+            logger.debug(f"アクティブウィンドウ: {window.app_name} - {window.window_title}")
+
+            if cfg.capture.mode == "active_window" and not window.window_id:
+                logger.warning("active_windowモードですがウィンドウIDを取得できませんでした。次ループへ")
+                skip = True
+
+            # 2. 除外判定①（アプリ名・タイトル）
+            if not skip:
+                should_exclude, reason = filter_module.should_exclude_pre_capture(window, cfg)
+                if should_exclude:
+                    if cfg.filter.log_exclusion_reason:
+                        logger.debug(f"除外判定: {reason}")
+                    skip = True
+
+            # 3. スクリーンキャプチャ
+            if not skip:
+                image_path = capture.take_screenshot(
+                    temp_dir=cfg.capture.temp_dir,
+                    mode=cfg.capture.mode,
+                    window_id=window.window_id if cfg.capture.mode == "active_window" else None,
+                )
+                if image_path is None:
+                    logger.warning("スクリーンショット撮影に失敗しました。次ループへ")
+                    skip = True
+
+            # 4. OCR処理
+            ocr_text = ""
+            if not skip and image_path:
+                ocr_text = ocr.extract_text(image_path)
+                logger.debug(f"OCR結果: {len(ocr_text)}文字")
+
+            # 5. 除外判定②（OCR結果）
+            if not skip:
+                should_exclude, reason = filter_module.should_exclude_post_capture(ocr_text, cfg)
+                if should_exclude:
+                    if cfg.filter.log_exclusion_reason:
+                        logger.debug(f"除外判定: {reason}")
+                    skip = True
+
+            # 6. ログ保存
+            if not skip:
+                storage.save_log(
+                    window_info=window,
+                    ocr_text=ocr_text,
+                    base_dir=cfg.storage.base_dir,
+                    log_subdir=cfg.storage.log_subdir,
+                )
+
+        except KeyboardInterrupt:
+            logger.info("キーボード割り込みを受信しました")
+            running = False
+            break
+        except Exception as e:
+            logger.error(f"メインループ中に予期しないエラーが発生しました: {e}", exc_info=True)
+        finally:
+            if image_path:
                 try:
-                    # active_windowモードの場合は座標情報も取得
-                    include_bounds = cfg.capture.mode == "active_window"
-                    window = window_info.get_active_window(include_bounds=include_bounds)
-                    logger.debug(f"アクティブウィンドウ: {window.app_name} - {window.window_title}")
-                except Exception as e:
-                    logger.error(f"ウィンドウ情報取得中にエラーが発生しました: {e}")
-                    time.sleep(cfg.capture.interval)
-                    continue
-                
-                # 2. 除外判定①（アプリ名・タイトル）
-                try:
-                    should_exclude, reason = filter_module.should_exclude_pre_capture(window, cfg)
-                    if should_exclude:
-                        # 除外理由のログはfilterモジュール内で設定に従って出力される
-                        if cfg.filter.log_exclusion_reason:
-                            logger.debug(f"除外判定: {reason}")
-                        time.sleep(cfg.capture.interval)
-                        continue
-                except Exception as e:
-                    logger.error(f"除外判定中にエラーが発生しました: {e}")
-                    time.sleep(cfg.capture.interval)
-                    continue
-                
-                # 3. スクリーンキャプチャ
-                image_path = None
-                try:
-                    image_path = capture.take_screenshot(
-                        temp_dir=cfg.capture.temp_dir,
-                        mode=cfg.capture.mode,
-                        window_id=window.window_id if cfg.capture.mode == "active_window" else None
-                    )
-                    if image_path is None:
-                        logger.warning("スクリーンショット撮影に失敗しました。次ループへ")
-                        time.sleep(cfg.capture.interval)
-                        continue
-                except Exception as e:
-                    logger.error(f"スクリーンショット撮影中にエラーが発生しました: {e}")
-                    time.sleep(cfg.capture.interval)
-                    continue
-                
-                # 4. OCR処理
-                ocr_text = ""
-                try:
-                    ocr_text = ocr.extract_text(image_path)
-                    logger.debug(f"OCR結果: {len(ocr_text)}文字")
-                except Exception as e:
-                    logger.error(f"OCR処理中にエラーが発生しました: {e}")
-                    # OCR失敗時も画像を削除して次ループへ
-                    if image_path:
-                        capture.delete_image(image_path)
-                    time.sleep(cfg.capture.interval)
-                    continue
-                
-                # 5. 除外判定②（OCR結果）
-                try:
-                    should_exclude, reason = filter_module.should_exclude_post_capture(ocr_text, cfg)
-                    if should_exclude:
-                        # 除外理由のログはfilterモジュール内で設定に従って出力される
-                        if cfg.filter.log_exclusion_reason:
-                            logger.debug(f"除外判定: {reason}")
-                        # 除外時は画像を削除して次ループへ
-                        if image_path:
-                            capture.delete_image(image_path)
-                        time.sleep(cfg.capture.interval)
-                        continue
-                except Exception as e:
-                    logger.error(f"除外判定中にエラーが発生しました: {e}")
-                    # エラー時も画像を削除して次ループへ
-                    if image_path:
-                        capture.delete_image(image_path)
-                    time.sleep(cfg.capture.interval)
-                    continue
-                
-                # 6. ログ保存
-                try:
-                    storage.save_log(
-                        window_info=window,
-                        ocr_text=ocr_text,
-                        base_dir=cfg.storage.base_dir,
-                        log_subdir=cfg.storage.log_subdir
-                    )
-                except Exception as e:
-                    logger.error(f"ログ保存中にエラーが発生しました: {e}")
-                    # ログ保存失敗時も画像を削除して次ループへ
-                    if image_path:
-                        capture.delete_image(image_path)
-                    time.sleep(cfg.capture.interval)
-                    continue
-                
-                # 7. 画像削除
-                if image_path:
                     capture.delete_image(image_path)
-                
-                # 8. インターバル待機
-                time.sleep(cfg.capture.interval)
-                
-            except KeyboardInterrupt:
-                # SIGINTはsignal_handlerで処理されるが、念のため
-                logger.info("キーボード割り込みを受信しました")
-                running = False
-                break
-            except Exception as e:
-                # 予期しないエラーでもログ出力して継続
-                logger.error(f"メインループ中に予期しないエラーが発生しました: {e}", exc_info=True)
-                # 画像が残っている場合は削除
-                if 'image_path' in locals() and image_path:
-                    try:
-                        capture.delete_image(image_path)
-                    except Exception:
-                        pass
-                time.sleep(cfg.capture.interval)
-                continue
+                except Exception:
+                    pass
+
+        if running:
+            time.sleep(cfg.capture.interval)
         
     logger.info("SnapLogを終了しました")
 
@@ -286,4 +208,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

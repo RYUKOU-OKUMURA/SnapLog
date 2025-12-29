@@ -604,7 +604,7 @@ logging.basicConfig(
 ```bash
 #!/bin/bash
 cd "$(dirname "$0")/.."
-nohup python src/main.py > /dev/null 2>&1 &
+nohup python -m src.main > /dev/null 2>&1 &
 echo $! > .pid
 echo "SnapLog started with PID: $(cat .pid)"
 ```
@@ -639,7 +639,8 @@ fi
     <key>ProgramArguments</key>
     <array>
         <string>/usr/bin/python3</string>
-        <string>/path/to/SnapLog/src/main.py</string>
+        <string>-m</string>
+        <string>src.main</string>
     </array>
     <key>RunAtLoad</key>
     <true/>

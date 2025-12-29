@@ -123,7 +123,8 @@ class LLMClient:
                     continue
                 else:
                     raise LLMClientError(
-                        f"LLM APIに接続できませんでした。LLMサーバー（{self.endpoint}）が起動しているか確認してください。"
+                        "LLM APIに接続できませんでした。"
+                        f"LLMサーバーが起動しているか確認してください。（エンドポイント: {self.endpoint}）"
                     )
                     
             except requests.exceptions.HTTPError as e:
@@ -218,4 +219,3 @@ def create_llm_client(config) -> LLMClient:
         model=config.llm.model,
         max_tokens=config.llm.max_tokens
     )
-

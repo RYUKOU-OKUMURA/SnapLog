@@ -9,7 +9,8 @@
     <key>ProgramArguments</key>
     <array>
         <string>/usr/bin/python3</string>
-        <string>/path/to/SnapLog/src/main.py</string>
+        <string>-m</string>
+        <string>src.main</string>
         <!-- メニューバーUIを使用する場合: -->
         <!-- <string>--menu-bar</string> -->
     </array>
@@ -52,4 +53,3 @@
 - Terminalで許可しても、launchd配下の実行で権限が再度必要になる場合があります
 - まずは start.sh で動作確認し、安定運用はログイン項目（ラッパーApp等）を推奨します
 -->
-

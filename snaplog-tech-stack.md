@@ -652,14 +652,14 @@ pytest --cov=src tests/
 
 **方法1: フォアグラウンド実行**
 ```bash
-python src/main.py
+python -m src.main
 # Ctrl+C で停止
 ```
 
 **方法2: バックグラウンド実行**
 ```bash
 # 起動
-nohup python src/main.py > /dev/null 2>&1 &
+nohup python -m src.main > /dev/null 2>&1 &
 echo $! > .pid
 
 # 停止
@@ -739,7 +739,7 @@ cp config/settings.yaml.example config/settings.yaml
 # システム設定 > プライバシーとセキュリティ > アクセシビリティ で実行アプリを許可
 
 # 6. 動作確認
-python src/main.py
+python -m src.main
 
 # 7. （オプション）LM Studioまたは Ollama起動
 # LM Studio: アプリ起動 → Local Server → Start

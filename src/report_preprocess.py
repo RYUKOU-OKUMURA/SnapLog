@@ -254,29 +254,27 @@ def split_into_chunks(
     Returns:
         List[str]: 分割されたテキストのリスト
     """
+    if max_chars < 1:
+        raise ValueError("max_chars must be >= 1")
+
     if len(text) <= max_chars:
         return [text]
     
-    chunks = []
-    lines = text.split("\n")
-    current_chunk = []
-    current_length = 0
-    
-    for line in lines:
-        line_length = len(line) + 1  # +1 for newline
-        
-        if current_length + line_length > max_chars and current_chunk:
-            # 現在のチャンクを保存
-            chunks.append("\n".join(current_chunk))
-            current_chunk = [line]
-            current_length = line_length
-        else:
-            current_chunk.append(line)
-            current_length += line_length
-    
-    # 最後のチャンクを追加
-    if current_chunk:
-        chunks.append("\n".join(current_chunk))
+    chunks: List[str] = []
+    start = 0
+
+    while start < len(text):
+        end = min(start + max_chars, len(text))
+
+        # なるべく改行で区切る（ただし進捗が止まらないようにガード）
+        if end < len(text):
+            last_newline = text.rfind("\n", start, end)
+            if last_newline != -1 and last_newline > start:
+                end = last_newline + 1
+
+        chunk = text[start:end].rstrip("\n")
+        chunks.append(chunk)
+        start = end
     
     logger.info(f"テキストを{len(chunks)}チャンクに分割しました（最大文字数: {max_chars}）")
     return chunks
@@ -336,4 +334,3 @@ def preprocess_logs(
     
     logger.info(f"前処理完了: {len(all_chunks)}チャンクを生成しました")
     return all_chunks
-

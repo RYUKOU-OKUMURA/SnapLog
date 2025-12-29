@@ -87,7 +87,7 @@ vim config/settings.yaml
 
 ```bash
 # フォアグラウンドで実行（テスト用）
-python src/main.py
+python -m src.main
 
 # バックグラウンドで実行
 ./scripts/start.sh
@@ -97,10 +97,10 @@ python src/main.py
 
 ```bash
 # 今日の日報を生成
-python src/report.py
+python -m src.report
 
 # 特定の日の日報を生成
-python src/report.py --date 2025-01-15
+python -m src.report --date 2025-01-15
 ```
 
 ---
@@ -181,9 +181,9 @@ SnapLog/
 |----------|------|
 | `./scripts/start.sh` | バックグラウンドで起動 |
 | `./scripts/stop.sh` | 停止 |
-| `python src/main.py` | フォアグラウンドで起動 |
-| `python src/report.py` | 今日の日報を生成 |
-| `python src/report.py --date YYYY-MM-DD` | 指定日の日報を生成 |
+| `python -m src.main` | フォアグラウンドで起動 |
+| `python -m src.report` | 今日の日報を生成 |
+| `python -m src.report --date YYYY-MM-DD` | 指定日の日報を生成 |
 
 ---
 

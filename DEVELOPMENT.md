@@ -110,7 +110,7 @@ pip install pyinstaller
 pyinstaller --onefile --windowed --name=SnapLog \
   --icon=icon.icns \
   --add-data "config:config" \
-  src/main.py
+  run_snaplog.py
 ```
 
 ### 4. インストーラー作成（オプション）
@@ -169,4 +169,3 @@ feat: active_windowモードを実装
 fix: メニューバーUIの状態表示を修正
 docs: 開発ガイドを追加
 ```
-
