@@ -30,19 +30,7 @@ def generate_report_header(date: str) -> str:
     Returns:
         str: Markdown形式のヘッダー
     """
-    # 日付を日本語形式に変換
-    try:
-        dt = datetime.strptime(date, "%Y-%m-%d")
-        date_jp = dt.strftime("%Y年%m月%d日")
-        weekday = ["月", "火", "水", "木", "金", "土", "日"][dt.weekday()]
-    except Exception:
-        date_jp = date
-        weekday = ""
-    
-    header = f"""# 日報 - {date_jp}（{weekday}）
-
----
-"""
+    header = f"# {date} 日報"
     return header
 
 
@@ -265,4 +253,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
