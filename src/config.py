@@ -50,6 +50,8 @@ class ReportConfig:
     """日報生成設定（Phase 2用）"""
     group_gap_minutes: int = 10
     chunk_chars: int = 12000
+    add_timestamp: bool = True
+    timestamp_format: str = "%H-%M-%S"
 
 
 @dataclass
@@ -97,22 +99,28 @@ def load_config(config_path: Optional[str] = None) -> Config:
     Returns:
         Config: 設定オブジェクト
     """
+    project_root = Path(__file__).parent.parent
+    default_config_path = project_root / "config" / "settings.yaml"
+
     if config_path is None:
         # 環境変数からパスを取得（.app バンドル用）
         config_path = os.environ.get('SNAPLOG_CONFIG')
 
     if config_path is None:
         # デフォルトパス: config/settings.yaml
-        project_root = Path(__file__).parent.parent
-        config_path = project_root / "config" / "settings.yaml"
+        config_path = default_config_path
     
     config_path = Path(config_path)
     
-    # 設定ファイルが存在しない場合はデフォルト値を使用
+    # 設定ファイルが存在しない場合はフォールバック
     if not config_path.exists():
-        config = Config()
-        config.expand_paths()
-        return config
+        env_config_path = os.environ.get('SNAPLOG_CONFIG')
+        if env_config_path and Path(env_config_path) == config_path and default_config_path.exists():
+            config_path = default_config_path
+        else:
+            config = Config()
+            config.expand_paths()
+            return config
     
     # YAMLファイルを読み込み
     with open(config_path, "r", encoding="utf-8") as f:
@@ -133,5 +141,4 @@ def load_config(config_path: Optional[str] = None) -> Config:
     config.validate()
     
     return config
-
 

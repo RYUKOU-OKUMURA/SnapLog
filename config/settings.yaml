@@ -67,9 +67,10 @@ llm:
 report:
   group_gap_minutes: 10           # 10分以上の空きでセッション分割
   chunk_chars: 12000              # LLM投入用の分割（概算）
+  add_timestamp: true             # ファイル名に時刻を付与して複数生成を許可
+  timestamp_format: "%H-%M-%S"    # 例: 21-35-02
 
 # ===== ログ設定 =====
 logging:
   level: "INFO"                   # DEBUG, INFO, WARNING, ERROR
   file: "~/Documents/SnapLog/app.log"
-

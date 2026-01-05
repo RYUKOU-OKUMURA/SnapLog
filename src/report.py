@@ -4,6 +4,7 @@ import logging
 import sys
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 try:
     from . import config
@@ -58,11 +59,29 @@ def combine_reports(reports: list[str], date: str) -> str:
     return "\n".join(combined)
 
 
+def build_report_filename(date: str, timestamp: Optional[str] = None) -> str:
+    """
+    日報ファイル名を生成
+
+    Args:
+        date: 対象日（YYYY-MM-DD形式）
+        timestamp: 追加の時刻サフィックス
+
+    Returns:
+        str: ファイル名
+    """
+    if timestamp:
+        safe_timestamp = timestamp.replace(":", "-").replace(" ", "_")
+        return f"report_{date}_{safe_timestamp}.md"
+    return f"report_{date}.md"
+
+
 def save_report(
     report_content: str,
     base_dir: str,
     report_subdir: str,
-    date: str
+    date: str,
+    timestamp: Optional[str] = None
 ) -> Path:
     """
     日報をファイルに保存
@@ -81,7 +100,7 @@ def save_report(
     
     # ファイルパス生成
     report_dir = Path(base_dir) / report_subdir
-    report_file = report_dir / f"report_{date}.md"
+    report_file = report_dir / build_report_filename(date, timestamp)
     
     # ファイルに保存
     try:
@@ -175,11 +194,16 @@ def generate_report_for_date(
         combined_report = header + "\n" + report_chunks[0] if report_chunks else ""
     
     # 5. ファイルに保存
+    timestamp = None
+    if cfg.report.add_timestamp:
+        timestamp = datetime.now().strftime(cfg.report.timestamp_format)
+
     report_path = save_report(
         report_content=combined_report,
         base_dir=cfg.storage.base_dir,
         report_subdir=cfg.storage.report_subdir,
-        date=target_date
+        date=target_date,
+        timestamp=timestamp
     )
     
     logger.info(f"日報生成が完了しました: {report_path}")
