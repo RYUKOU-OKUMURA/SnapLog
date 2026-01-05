@@ -1,0 +1,75 @@
+# SnapLog 設定ファイル
+
+# ===== 基本設定 =====
+capture:
+  interval: 60                    # キャプチャ間隔（秒）
+  mode: "fullscreen"              # fullscreen（MVP） / active_window（拡張）
+  temp_dir: "/tmp"                # 一時ファイル保存先
+
+# ===== 保存先 =====
+storage:
+  base_dir: "~/Documents/SnapLog"
+  log_subdir: "logs"
+  report_subdir: "reports"
+  retention_days: 14              # 保持日数
+  cleanup_on_start: true          # 起動時に古いファイルを削除
+
+# ===== 除外設定 =====
+filter:
+  # 許可リスト（allowlist）: このリストが空でない場合、リストに含まれるアプリのみ記録
+  # 例: 開発作業のみ記録したい場合
+  # allow_apps:
+  #   - "Cursor"
+  #   - "Visual Studio Code"
+  #   - "Terminal"
+  
+  # 除外するアプリ名（完全一致）
+  exclude_apps:
+    - "1Password"
+    - "1Password 7"
+    - "Keychain Access"
+    - "キーチェーンアクセス"
+    - "Bitwarden"
+  
+  # 除外するウィンドウタイトル（部分一致）
+  exclude_title_keywords:
+    - "銀行"
+    - "Bank"
+    - "クレジットカード"
+    - "Credit Card"
+    - "パスワード"
+    - "Password"
+    - "ログイン"
+    - "Sign in"
+  
+  # 除外するOCRパターン（正規表現）
+  exclude_patterns:
+    # クレジットカード番号（4桁×4）
+    - '\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}'
+    # 電話番号
+    - '\d{2,4}-\d{2,4}-\d{4}'
+    # マイナンバー
+    - '\d{4}[-\s]?\d{4}[-\s]?\d{4}'
+  
+  # 除外判定のログを残すかどうか（プライバシー強化: false推奨）
+  log_exclusion_reason: false
+
+# ===== LLM設定（Phase 2）=====
+llm:
+  # LM Studioの場合
+  endpoint: "http://localhost:1234/v1/chat/completions"
+  # Ollamaの場合
+  # endpoint: "http://localhost:11434/v1/chat/completions"
+  model: "llama3.2"
+  max_tokens: 2000
+
+# ===== 日報生成（Phase 2）=====
+report:
+  group_gap_minutes: 10           # 10分以上の空きでセッション分割
+  chunk_chars: 12000              # LLM投入用の分割（概算）
+
+# ===== ログ設定 =====
+logging:
+  level: "INFO"                   # DEBUG, INFO, WARNING, ERROR
+  file: "~/Documents/SnapLog/app.log"
+

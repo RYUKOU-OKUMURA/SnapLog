@@ -71,8 +71,9 @@ def run_main_loop(cfg: config.Config):
         report_subdir=cfg.storage.report_subdir
     )
     
-    # シグナルハンドラ登録（SIGINT）
-    signal.signal(signal.SIGINT, signal_handler)
+    # シグナルハンドラ登録（SIGINT）- メインスレッドでのみ有効
+    if threading.current_thread() is threading.main_thread():
+        signal.signal(signal.SIGINT, signal_handler)
     
     logger.info(f"キャプチャ間隔: {cfg.capture.interval}秒")
     logger.info(f"キャプチャモード: {cfg.capture.mode}")

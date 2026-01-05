@@ -69,19 +69,17 @@ def extract_text(
         
         # リクエストハンドラを作成
         handler = Vision.VNImageRequestHandler.alloc().initWithCIImage_options_(
-            ci_image, None
+            ci_image, {}
         )
         if handler is None:
             logger.error("VNImageRequestHandlerの作成に失敗しました")
             return ""
         
         # OCRを実行
-        # pyobjcでは、エラーを無視する場合はNoneを渡す
-        error_ref = [None]  # エラー参照用のリスト
-        success = handler.performRequests_error_([request], error_ref)
-        
+        # pyobjcでは、エラーパラメータにNoneを渡すと戻り値として(result, error)のタプルが返る
+        success, error = handler.performRequests_error_([request], None)
+
         if not success:
-            error = error_ref[0] if error_ref[0] else "不明なエラー"
             logger.warning(f"OCR処理が失敗しました: {image_path}, エラー: {error}")
             return ""
         

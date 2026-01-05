@@ -90,13 +90,17 @@ class Config:
 def load_config(config_path: Optional[str] = None) -> Config:
     """
     設定ファイルを読み込む
-    
+
     Args:
         config_path: 設定ファイルのパス（Noneの場合はデフォルトパスを使用）
-        
+
     Returns:
         Config: 設定オブジェクト
     """
+    if config_path is None:
+        # 環境変数からパスを取得（.app バンドル用）
+        config_path = os.environ.get('SNAPLOG_CONFIG')
+
     if config_path is None:
         # デフォルトパス: config/settings.yaml
         project_root = Path(__file__).parent.parent
