@@ -61,9 +61,14 @@ class SnapLogMenuBarApp(rumps.App):
         
         # レポートフォルダを開く
         self.menu.add(rumps.MenuItem("レポートフォルダを開く", callback=self.open_reports_folder))
-        
+
         self.menu.add(rumps.separator)
-        
+
+        # 設定を開く
+        self.menu.add(rumps.MenuItem("設定を開く", callback=self.open_settings))
+
+        self.menu.add(rumps.separator)
+
         # 終了
         self.menu.add(rumps.MenuItem("終了", callback=self.quit_app))
     
@@ -118,7 +123,17 @@ class SnapLogMenuBarApp(rumps.App):
         report_dir = Path(self.cfg.storage.base_dir) / self.cfg.storage.report_subdir
         report_dir.mkdir(parents=True, exist_ok=True)
         subprocess.run(["open", str(report_dir)])
-    
+
+    @rumps.clicked("設定を開く")
+    def open_settings(self, _):
+        """設定ファイルを開く"""
+        import os
+        config_path = os.environ.get('SNAPLOG_CONFIG')
+        if config_path is None:
+            # デフォルトパス
+            config_path = Path(__file__).parent.parent / "config" / "settings.yaml"
+        subprocess.run(["open", str(config_path)])
+
     @rumps.clicked("終了")
     def quit_app(self, _):
         """アプリケーションを終了"""

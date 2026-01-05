@@ -3,7 +3,7 @@
 # ===== 基本設定 =====
 capture:
   interval: 60                    # キャプチャ間隔（秒）
-  mode: "fullscreen"              # fullscreen（MVP） / active_window（拡張）
+  mode: "fullscreen"              # fullscreen / active_window（アクティブウィンドウのみ）
   temp_dir: "/tmp"                # 一時ファイル保存先
 
 # ===== 保存先 =====
@@ -57,10 +57,10 @@ filter:
 # ===== LLM設定（Phase 2）=====
 llm:
   # LM Studioの場合
-  endpoint: "http://localhost:1234/v1/chat/completions"
+  endpoint: "http://169.254.196.135:1234/v1/chat/completions"
   # Ollamaの場合
   # endpoint: "http://localhost:11434/v1/chat/completions"
-  model: "llama3.2"
+  model: "nvidia/nemotron-3-nano"
   max_tokens: 2000
 
 # ===== 日報生成（Phase 2）=====
