@@ -218,15 +218,16 @@ class LLMClient:
 def create_llm_client(config) -> LLMClient:
     """
     設定からLLMクライアントを作成
-    
+
     Args:
         config: Configオブジェクト
-        
+
     Returns:
         LLMClient: LLMクライアントインスタンス
     """
     return LLMClient(
         endpoint=config.llm.endpoint,
         model=config.llm.model,
-        max_tokens=config.llm.max_tokens
+        max_tokens=config.llm.max_tokens,
+        timeout=getattr(config.llm, 'timeout', 300)
     )

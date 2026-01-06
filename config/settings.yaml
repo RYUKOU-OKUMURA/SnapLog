@@ -57,16 +57,17 @@ filter:
 # ===== LLM設定（Phase 2）=====
 llm:
   # LM Studioの場合
-  endpoint: "http://169.254.196.135:1234/v1/chat/completions"
+  endpoint: "http://localhost:1234/v1/chat/completions"
   # Ollamaの場合
   # endpoint: "http://localhost:11434/v1/chat/completions"
-  model: "nvidia/nemotron-3-nano"
-  max_tokens: 2000
+  model: "google/gemma-3-27b"     # Gemma 3 27B（128Kコンテキスト対応）
+  max_tokens: 4000                # 出力トークン数（日報には十分）
+  timeout: 300                    # タイムアウト（秒）- 27Bモデルは推論に時間がかかる
 
 # ===== 日報生成（Phase 2）=====
 report:
   group_gap_minutes: 10           # 10分以上の空きでセッション分割
-  chunk_chars: 12000              # LLM投入用の分割（概算）
+  chunk_chars: 6000               # LLM投入用の分割（LM Studioのデフォルト設定に対応）
   add_timestamp: true             # ファイル名に時刻を付与して複数生成を許可
   timestamp_format: "%H-%M-%S"    # 例: 21-35-02
 

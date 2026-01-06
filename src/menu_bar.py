@@ -91,20 +91,32 @@ class SnapLogMenuBarApp(rumps.App):
     @rumps.clicked("今日の日報を生成")
     def generate_today_report(self, _):
         """今日の日報を生成"""
+        def _progress_callback(current, total, status):
+            """進捗コールバック - メニューバータイトルを更新"""
+            if status == "processing":
+                self.title = f"📝 {current}/{total}"
+            elif status == "completed":
+                self.title = "SnapLog"
+
         def _generate():
             try:
+                self.title = "📝 準備中..."
                 rumps.notification("SnapLog", "日報生成開始", "日報を生成しています...")
                 from datetime import datetime
                 target_date = datetime.now().strftime("%Y-%m-%d")
-                report_path = report_module.generate_report_for_date(target_date, self.cfg)
+                report_path = report_module.generate_report_for_date(
+                    target_date, self.cfg, progress_callback=_progress_callback
+                )
+                self.title = "SnapLog"
                 if report_path:
-                    rumps.notification("SnapLog", "日報生成完了", f"日報を生成しました: {report_path}")
+                    rumps.notification("SnapLog", "日報生成完了", f"日報を生成しました")
                 else:
                     rumps.notification("SnapLog", "日報生成失敗", "日報の生成に失敗しました")
             except Exception as e:
+                self.title = "SnapLog"
                 logger.error(f"日報生成エラー: {e}")
-                rumps.notification("SnapLog", "エラー", f"日報生成中にエラーが発生しました: {e}")
-        
+                rumps.notification("SnapLog", "エラー", f"日報生成中にエラーが発生しました")
+
         # 別スレッドで実行（UIをブロックしない）
         thread = threading.Thread(target=_generate)
         thread.daemon = True

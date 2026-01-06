@@ -117,7 +117,8 @@ def save_report(
 
 def generate_report_for_date(
     target_date: str,
-    cfg: config.Config
+    cfg: config.Config,
+    progress_callback=None
 ) -> Path:
     """
     指定日の日報を生成
@@ -125,10 +126,11 @@ def generate_report_for_date(
     Args:
         target_date: 対象日（YYYY-MM-DD形式）
         cfg: 設定オブジェクト
-        
+        progress_callback: 進捗コールバック関数 (current, total, status) -> None
+
     Returns:
         Path: 生成された日報ファイルのパス
-        
+
     Raises:
         Exception: 日報生成に失敗した場合
     """
@@ -163,7 +165,11 @@ def generate_report_for_date(
     
     for i, chunk in enumerate(chunks):
         logger.info(f"チャンク {i + 1}/{len(chunks)} を処理中...")
-        
+
+        # 進捗コールバック
+        if progress_callback:
+            progress_callback(i + 1, len(chunks), "processing")
+
         try:
             # LLMで日報生成
             if len(chunks) > 1:
@@ -206,6 +212,10 @@ def generate_report_for_date(
         timestamp=timestamp
     )
     
+    # 完了コールバック
+    if progress_callback:
+        progress_callback(len(chunks), len(chunks), "completed")
+
     logger.info(f"日報生成が完了しました: {report_path}")
     return report_path
 

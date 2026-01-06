@@ -43,6 +43,7 @@ class LLMConfig:
     endpoint: str = "http://localhost:1234/v1/chat/completions"
     model: str = "llama3.2"
     max_tokens: int = 2000
+    timeout: int = 300  # タイムアウト（秒）
 
 
 @dataclass
