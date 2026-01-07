@@ -3,7 +3,7 @@
 # ===== 基本設定 =====
 capture:
   interval: 60                    # キャプチャ間隔（秒）
-  mode: "fullscreen"              # fullscreen / active_window（アクティブウィンドウのみ）
+  mode: "active_window"           # fullscreen / active_window（アクティブウィンドウのみ）
   temp_dir: "/tmp"                # 一時ファイル保存先
 
 # ===== 保存先 =====

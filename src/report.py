@@ -144,7 +144,7 @@ def generate_report_for_date(
             target_date=target_date,
             group_gap_minutes=cfg.report.group_gap_minutes,
             chunk_chars=cfg.report.chunk_chars,
-            mask_sensitive=False
+            mask_sensitive=True
         )
     except Exception as e:
         logger.error(f"ログ前処理中にエラーが発生しました: {e}")
