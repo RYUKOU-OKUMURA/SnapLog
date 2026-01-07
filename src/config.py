@@ -35,6 +35,31 @@ class FilterConfig:
     allow_apps: List[str] = field(default_factory=list)
     # 除外判定のログを残すかどうか（プライバシー強化）
     log_exclusion_reason: bool = False
+    # 重複排除: 類似度がこの値以上なら重複とみなす（0.0-1.0）
+    similarity_threshold: float = 0.9
+    # UIノイズ除去: 削除するパターン（正規表現）
+    ui_noise_patterns: List[str] = field(default_factory=lambda: [
+        # 日本語メニュー項目
+        r"^(ファイル|編集|表示|選択|移動|実行|ターミナル|ウィンドウ|ヘルプ|アシスタント|履歴|ブックマーク|プロファイル|タブ)$",
+        # 日付時刻表示
+        r"^\d+月\d+日（[日月火水木金土]）\s*\d+:\d+$",
+        # 英語メニュー
+        r"^[A-Z][a-z]+\s+(File|Edit|View|Window|Help)$",
+        # アプリ名単独
+        r"^(Cursor|Comet|SnapLog|YouTube|Claude Code|Facebook|Google)$",
+        # 短い記号・無意味な文字（1-3文字）
+        r"^[X★⑨②Q\+\-×n山くの]{1,3}$",
+        r"^[0-9]{2,3}$",  # 数字のみ（80, 080など）
+        # UI定型文
+        r"^(いつもの|もっと見る|新着|開始する|（アシスタント|タグ・説明付き)$",
+        r"^[<>]\s*(Continue|タイムライン|アウトライン)",
+        # JSONフラグメント（OCRがコードを読んでしまったケース）
+        r'^[f"]?(timestamp|app_name|window_title|ocr_text|ocr_length)"?[：:｜|]',
+        r'^"(Comet|Cursor|cursor)"[，,]$',
+        # Cursor/IDE固有
+        r"^(Plan，|Codex|Git Graph|Composer|Agent)$",
+        r"^\d+\s*(main|maint)\*?\s*",  # Gitステータス行
+    ])
 
 
 @dataclass

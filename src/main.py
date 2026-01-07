@@ -124,7 +124,13 @@ def run_main_loop(cfg: config.Config):
                 ocr_text = ocr.extract_text(image_path)
                 logger.debug(f"OCR結果: {len(ocr_text)}文字")
 
-            # 5. 除外判定②（OCR結果）
+            # 5. UIノイズ除去
+            if not skip and ocr_text:
+                original_len = len(ocr_text)
+                ocr_text = filter_module.remove_ui_noise(ocr_text, cfg)
+                logger.debug(f"UIノイズ除去: {original_len}文字 -> {len(ocr_text)}文字")
+
+            # 6. 除外判定②（OCR結果）
             if not skip:
                 should_exclude, reason = filter_module.should_exclude_post_capture(ocr_text, cfg)
                 if should_exclude:
@@ -132,7 +138,14 @@ def run_main_loop(cfg: config.Config):
                         logger.debug(f"除外判定: {reason}")
                     skip = True
 
-            # 6. ログ保存
+            # 7. 重複判定
+            if not skip:
+                is_dup, reason = filter_module.is_duplicate(ocr_text, window.app_name, cfg)
+                if is_dup:
+                    logger.debug(f"重複スキップ: {reason}")
+                    skip = True
+
+            # 8. ログ保存
             if not skip:
                 storage.save_log(
                     window_info=window,

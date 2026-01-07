@@ -1,6 +1,7 @@
-"""フィルタモジュール（除外判定）"""
+"""フィルタモジュール（除外判定・重複排除・UIノイズ除去）"""
 import logging
 import re
+from difflib import SequenceMatcher
 from typing import Optional, Tuple
 
 from .config import Config
@@ -10,6 +11,10 @@ logger = logging.getLogger("snaplog.filter")
 
 # 正規表現パターンのキャッシュ（モジュールレベル）
 _compiled_patterns_cache: dict[str, re.Pattern] = {}
+
+# 前回のOCRテキストを保持（重複排除用）
+_last_ocr_text: Optional[str] = None
+_last_app_name: Optional[str] = None
 
 
 def _compile_patterns(patterns: list[str]) -> list[re.Pattern]:
@@ -113,6 +118,97 @@ def should_exclude_post_capture(ocr_text: str, config: Config) -> Tuple[bool, Op
         except Exception as e:
             logger.warning(f"正規表現マッチング中にエラーが発生しました: {pattern.pattern}, エラー: {e}")
             continue
-    
+
     return False, None
+
+
+def calculate_similarity(text1: str, text2: str) -> float:
+    """
+    2つのテキストの類似度を計算（0.0〜1.0）
+
+    Args:
+        text1: テキスト1
+        text2: テキスト2
+
+    Returns:
+        float: 類似度（0.0〜1.0）
+    """
+    if not text1 or not text2:
+        return 0.0
+    return SequenceMatcher(None, text1, text2).ratio()
+
+
+def is_duplicate(
+    ocr_text: str,
+    app_name: str,
+    config: Config
+) -> Tuple[bool, Optional[str]]:
+    """
+    重複判定（前回のOCRテキストとの類似度チェック）
+
+    Args:
+        ocr_text: 現在のOCRテキスト
+        app_name: 現在のアプリ名
+        config: 設定オブジェクト
+
+    Returns:
+        Tuple[bool, Optional[str]]: (重複かどうか, 理由)
+    """
+    global _last_ocr_text, _last_app_name
+
+    threshold = config.filter.similarity_threshold
+
+    # 前回と同じアプリで、類似度が閾値以上なら重複
+    if _last_ocr_text and _last_app_name == app_name:
+        similarity = calculate_similarity(ocr_text, _last_ocr_text)
+        if similarity >= threshold:
+            reason = f"重複検出: 類似度 {similarity:.2%} >= {threshold:.0%}"
+            if config.filter.log_exclusion_reason:
+                logger.debug(reason)
+            return True, reason
+
+    # 重複でない場合は現在の状態を保存
+    _last_ocr_text = ocr_text
+    _last_app_name = app_name
+
+    return False, None
+
+
+def remove_ui_noise(ocr_text: str, config: Config) -> str:
+    """
+    OCRテキストからUIノイズを除去
+
+    Args:
+        ocr_text: 元のOCRテキスト
+        config: 設定オブジェクト
+
+    Returns:
+        str: ノイズ除去後のテキスト
+    """
+    if not ocr_text or not config.filter.ui_noise_patterns:
+        return ocr_text
+
+    # パターンをコンパイル
+    compiled_patterns = _compile_patterns(config.filter.ui_noise_patterns)
+
+    # 行ごとに処理
+    lines = ocr_text.split('\n')
+    cleaned_lines = []
+
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            continue
+
+        # パターンにマッチする行はスキップ
+        should_remove = False
+        for pattern in compiled_patterns:
+            if pattern.match(stripped):
+                should_remove = True
+                break
+
+        if not should_remove:
+            cleaned_lines.append(stripped)
+
+    return '\n'.join(cleaned_lines)
 
