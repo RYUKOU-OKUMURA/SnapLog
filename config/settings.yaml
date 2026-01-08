@@ -8,7 +8,7 @@ capture:
 
 # ===== 保存先 =====
 storage:
-  base_dir: "~/Documents/SnapLog"
+  base_dir: "/Users/ryukouokumura/マイドライブ（okumura@physical-balance-lab.net）/Obsidian Vault/SnapLog"
   log_subdir: "logs"
   report_subdir: "reports"
   retention_days: 14              # 保持日数
@@ -74,4 +74,4 @@ report:
 # ===== ログ設定 =====
 logging:
   level: "INFO"                   # DEBUG, INFO, WARNING, ERROR
-  file: "~/Documents/SnapLog/app.log"
+  file: "/Users/ryukouokumura/マイドライブ（okumura@physical-balance-lab.net）/Obsidian Vault/SnapLog/app.log"
