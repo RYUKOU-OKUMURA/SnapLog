@@ -4,6 +4,8 @@ import subprocess
 from dataclasses import dataclass
 from typing import Optional
 
+import Quartz
+
 logger = logging.getLogger("snaplog.window_info")
 
 
@@ -111,125 +113,127 @@ def get_window_title() -> str:
         return ""
 
 
+def get_frontmost_window_via_quartz() -> Optional[dict]:
+    """
+    Quartz APIを使用して最前面のウィンドウ情報を取得
+
+    Returns:
+        Optional[dict]: {"window_id": int, "app_name": str, "window_title": str, "bounds": dict} または None
+    """
+    try:
+        # 画面上のウィンドウリストを取得
+        window_list = Quartz.CGWindowListCopyWindowInfo(
+            Quartz.kCGWindowListOptionOnScreenOnly | Quartz.kCGWindowListExcludeDesktopElements,
+            Quartz.kCGNullWindowID
+        )
+
+        if not window_list:
+            logger.debug("ウィンドウリストの取得に失敗")
+            return None
+
+        # レイヤー0（通常のウィンドウ）で最前面のものを探す
+        for window in window_list:
+            layer = window.get(Quartz.kCGWindowLayer, 999)
+
+            # レイヤー0は通常のアプリウィンドウ
+            if layer == 0:
+                window_id = window.get(Quartz.kCGWindowNumber)
+                app_name = window.get(Quartz.kCGWindowOwnerName, "")
+                window_title = window.get(Quartz.kCGWindowName, "")
+                bounds_dict = window.get(Quartz.kCGWindowBounds, {})
+
+                # ウィンドウIDが有効でない場合はスキップ
+                if not window_id:
+                    continue
+
+                # 除外するシステムウィンドウ
+                if app_name in ["Window Server", "Dock", "SystemUIServer", "Control Center"]:
+                    continue
+
+                bounds = None
+                if bounds_dict:
+                    bounds = {
+                        "x": int(bounds_dict.get("X", 0)),
+                        "y": int(bounds_dict.get("Y", 0)),
+                        "width": int(bounds_dict.get("Width", 0)),
+                        "height": int(bounds_dict.get("Height", 0)),
+                    }
+
+                return {
+                    "window_id": window_id,
+                    "app_name": app_name,
+                    "window_title": window_title,
+                    "bounds": bounds,
+                }
+
+        logger.debug("有効な最前面ウィンドウが見つかりません")
+        return None
+
+    except Exception as e:
+        logger.debug(f"Quartz APIでのウィンドウ情報取得に失敗: {e}")
+        return None
+
+
 def get_window_id() -> Optional[int]:
     """
-    アクティブウィンドウのIDを取得
-    
+    アクティブウィンドウのIDを取得（Quartz API使用）
+
     Returns:
         Optional[int]: ウィンドウID（取得失敗時はNone）
     """
-    script = '''
-    tell application "System Events"
-        set frontApp to first application process whose frontmost is true
-        try
-            set windowId to id of front window of frontApp
-        on error
-            set windowId to 0
-        end try
-    end tell
-    return windowId
-    '''
-    
-    try:
-        result = subprocess.run(
-            ["osascript", "-e", script],
-            capture_output=True,
-            text=True,
-            timeout=5
-        )
-        
-        if result.returncode != 0:
-            logger.debug("ウィンドウID取得失敗（無視可能）")
-            return None
-        
-        window_id_str = result.stdout.strip()
-        if window_id_str and window_id_str.isdigit():
-            return int(window_id_str)
-        return None
-        
-    except Exception as e:
-        logger.debug(f"ウィンドウID取得中にエラーが発生しました（無視可能）: {e}")
-        return None
+    window_info = get_frontmost_window_via_quartz()
+    if window_info:
+        return window_info.get("window_id")
+    return None
 
 
 def get_window_bounds() -> Optional[dict]:
     """
-    アクティブウィンドウの座標とサイズを取得
-    
+    アクティブウィンドウの座標とサイズを取得（Quartz API使用）
+
     Returns:
         Optional[dict]: {"x": int, "y": int, "width": int, "height": int} または None
     """
-    script = '''
-    tell application "System Events"
-        set frontApp to first application process whose frontmost is true
-        try
-            set frontWindow to front window of frontApp
-            set windowBounds to bounds of frontWindow
-            return windowBounds
-        on error
-            return ""
-        end try
-    end tell
-    '''
-    
-    try:
-        result = subprocess.run(
-            ["osascript", "-e", script],
-            capture_output=True,
-            text=True,
-            timeout=5
-        )
-        
-        if result.returncode != 0:
-            logger.debug("ウィンドウ座標取得失敗（無視可能）")
-            return None
-        
-        bounds_str = result.stdout.strip()
-        if not bounds_str:
-            return None
-        
-        # AppleScriptのboundsは "x1, y1, x2, y2" 形式
-        try:
-            parts = [int(x.strip()) for x in bounds_str.split(",")]
-            if len(parts) == 4:
-                x1, y1, x2, y2 = parts
-                return {
-                    "x": x1,
-                    "y": y1,
-                    "width": x2 - x1,
-                    "height": y2 - y1
-                }
-        except ValueError:
-            logger.debug(f"ウィンドウ座標のパース失敗: {bounds_str}")
-            return None
-        
-        return None
-        
-    except Exception as e:
-        logger.debug(f"ウィンドウ座標取得中にエラーが発生しました（無視可能）: {e}")
-        return None
+    window_info = get_frontmost_window_via_quartz()
+    if window_info:
+        return window_info.get("bounds")
+    return None
 
 
 def get_active_window(include_bounds: bool = False) -> WindowInfo:
     """
     アクティブウィンドウの情報を取得
-    
+
     Args:
         include_bounds: Trueの場合、ウィンドウIDと座標も取得（active_windowモード用）
-    
+
     Returns:
         WindowInfo: ウィンドウ情報（app_name, window_title, window_id, window_bounds）
     """
-    app_name = get_active_app_name()
-    window_title = get_window_title()
-    
     window_id = None
     window_bounds = None
-    
+    quartz_app_name = ""
+    quartz_title = ""
+
+    # Quartz APIで情報を取得（ウィンドウID取得に信頼性が高い）
     if include_bounds:
-        window_id = get_window_id()
-        window_bounds = get_window_bounds()
-    
+        quartz_info = get_frontmost_window_via_quartz()
+        if quartz_info:
+            window_id = quartz_info.get("window_id")
+            window_bounds = quartz_info.get("bounds")
+            quartz_app_name = quartz_info.get("app_name", "")
+            quartz_title = quartz_info.get("window_title", "")
+
+    # AppleScriptでも情報を取得（ウィンドウタイトルが詳細に取れることがある）
+    applescript_app_name = get_active_app_name()
+    applescript_title = get_window_title()
+
+    # アプリ名: AppleScript優先（より正確）、なければQuartz
+    app_name = applescript_app_name if applescript_app_name else quartz_app_name
+
+    # タイトル: AppleScript優先（より詳細）、なければQuartz
+    window_title = applescript_title if applescript_title else quartz_title
+
     return WindowInfo(
         app_name=app_name,
         window_title=window_title,
