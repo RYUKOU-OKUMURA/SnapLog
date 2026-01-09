@@ -24,6 +24,8 @@ build/
 *.log
 logs/
 reports/
+config/settings.yaml
+config/com.user.snaplog.plist
 
 # macOS
 .DS_Store
@@ -35,4 +37,3 @@ reports/
 *.png
 *.jpg
 *.jpeg
-

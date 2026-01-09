@@ -83,6 +83,8 @@ cp config/settings.yaml.example config/settings.yaml
 vim config/settings.yaml
 ```
 
+※ `config/settings.yaml` は個人環境用の設定ファイルです。公開リポジトリには含めない想定です。
+
 ### 4. 起動
 
 ```bash
