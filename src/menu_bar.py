@@ -44,12 +44,21 @@ class SnapLogMenuBarApp(rumps.App):
         self.menu.clear()
         
         # 状態表示
-        status = "一時停止中" if main_module.paused else "実行中"
+        pause_state = main_module.get_pause_state()
+        if pause_state["auto"]:
+            reason = f"（{pause_state['auto_reason']}）" if pause_state["auto_reason"] else ""
+            status = f"自動一時停止中{reason}"
+        elif pause_state["resume_waiting"]:
+            status = "再開待機中"
+        elif pause_state["manual"]:
+            status = "一時停止中"
+        else:
+            status = "実行中"
         self.menu.add(rumps.MenuItem(f"状態: {status}", callback=None))
         self.menu.add(rumps.separator)
         
         # 一時停止/再開
-        pause_text = "再開" if main_module.paused else "一時停止"
+        pause_text = "再開" if main_module.is_manually_paused() else "一時停止"
         self.menu.add(rumps.MenuItem(pause_text, callback=self.toggle_pause))
         
         # 日報生成
@@ -83,10 +92,10 @@ class SnapLogMenuBarApp(rumps.App):
         main_module.toggle_pause()
         self.build_menu()
         
-        if main_module.paused:
-            rumps.notification("SnapLog", "一時停止", "キャプチャを一時停止しました")
+        if main_module.is_manually_paused():
+            rumps.notification("SnapLog", "一時停止", "手動でキャプチャを一時停止しました")
         else:
-            rumps.notification("SnapLog", "再開", "キャプチャを再開しました")
+            rumps.notification("SnapLog", "再開", "手動でキャプチャを再開しました")
     
     @rumps.clicked("今日の日報を生成")
     def generate_today_report(self, _):
@@ -162,4 +171,3 @@ def run_menu_bar():
     
     app = SnapLogMenuBarApp()
     app.run()
-

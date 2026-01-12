@@ -12,29 +12,67 @@ from . import ocr
 from . import filter as filter_module
 from . import storage
 from . import window_info
+from . import screen_state
 from . import logging as logging_module
 
 logger = logging.getLogger("snaplog.main")
 
 # グローバル変数: 実行フラグ（SIGINTでFalseになる）
 running = True
-# グローバル変数: 一時停止フラグ（pause機能用）
-paused = False
+# グローバル変数: 手動一時停止フラグ
+manual_paused = False
+# グローバル変数: 自動一時停止フラグ
+auto_paused = False
+# グローバル変数: 自動再開の待機終了時刻
+resume_block_until = None
+# グローバル変数: 自動一時停止の理由
+auto_pause_reason = ""
 
 
 def toggle_pause():
     """一時停止/再開を切り替え"""
-    global paused
-    paused = not paused
-    logger.info(f"一時停止状態: {'一時停止中' if paused else '実行中'}")
-    return paused
+    global manual_paused
+    manual_paused = not manual_paused
+    logger.info(f"手動一時停止状態: {'一時停止中' if manual_paused else '実行中'}")
+    return manual_paused
 
 
 def set_pause(state: bool):
     """一時停止状態を設定"""
-    global paused
-    paused = state
-    logger.info(f"一時停止状態: {'一時停止中' if paused else '実行中'}")
+    global manual_paused
+    manual_paused = state
+    logger.info(f"手動一時停止状態: {'一時停止中' if manual_paused else '実行中'}")
+
+
+def is_manually_paused() -> bool:
+    """手動一時停止中かどうか"""
+    return manual_paused
+
+
+def is_resume_waiting() -> bool:
+    """自動再開の待機中かどうか"""
+    global resume_block_until
+    if resume_block_until is None:
+        return False
+    if time.time() >= resume_block_until:
+        resume_block_until = None
+        return False
+    return True
+
+
+def is_effectively_paused() -> bool:
+    """実効的に一時停止中かどうか"""
+    return manual_paused or auto_paused or is_resume_waiting()
+
+
+def get_pause_state() -> dict:
+    """一時停止状態の詳細を取得"""
+    return {
+        "manual": manual_paused,
+        "auto": auto_paused,
+        "resume_waiting": is_resume_waiting(),
+        "auto_reason": auto_pause_reason,
+    }
 
 
 def signal_handler(signum, frame):
@@ -48,6 +86,53 @@ def signal_handler(signum, frame):
     global running
     logger.info("終了シグナルを受信しました。安全に終了します...")
     running = False
+
+
+def _get_auto_pause_reasons(cfg: config.Config) -> list:
+    reasons = []
+    if cfg.capture.pause_on_lock and screen_state.is_screen_locked():
+        reasons.append("screen_locked")
+    if cfg.capture.pause_on_display_sleep and screen_state.is_display_asleep():
+        reasons.append("display_asleep")
+    return reasons
+
+
+def _format_auto_pause_reason(reasons: list) -> str:
+    labels = {
+        "screen_locked": "画面ロック中",
+        "display_asleep": "ディスプレイスリープ中",
+    }
+    return " / ".join(labels.get(reason, reason) for reason in reasons)
+
+
+def update_auto_pause_state(cfg: config.Config) -> None:
+    """自動一時停止状態を更新"""
+    global auto_paused, resume_block_until, auto_pause_reason
+
+    if not cfg.capture.auto_pause:
+        if auto_paused:
+            auto_paused = False
+            auto_pause_reason = ""
+            resume_block_until = None
+        return
+
+    reasons = _get_auto_pause_reasons(cfg)
+    should_pause = bool(reasons)
+
+    if should_pause and not auto_paused:
+        auto_paused = True
+        auto_pause_reason = _format_auto_pause_reason(reasons)
+        resume_block_until = None
+        logger.info(f"自動一時停止: {auto_pause_reason}")
+    elif not should_pause and auto_paused:
+        auto_paused = False
+        auto_pause_reason = ""
+        if cfg.capture.resume_grace_sec > 0:
+            resume_block_until = time.time() + cfg.capture.resume_grace_sec
+            logger.info(f"自動再開: {cfg.capture.resume_grace_sec}秒待機")
+        else:
+            resume_block_until = None
+            logger.info("自動再開")
 
 
 def run_main_loop(cfg: config.Config):
@@ -81,9 +166,12 @@ def run_main_loop(cfg: config.Config):
     
     # メインループ
     while running:
+        # 自動一時停止の状態更新
+        update_auto_pause_state(cfg)
+
         # 一時停止チェック
-        if paused:
-            time.sleep(1)  # 1秒待機して再チェック
+        if is_effectively_paused():
+            time.sleep(cfg.capture.paused_poll_interval)
             continue
 
         skip = False

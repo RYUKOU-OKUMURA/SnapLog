@@ -13,6 +13,11 @@ class CaptureConfig:
     interval: int = 60
     mode: str = "fullscreen"
     temp_dir: str = "/tmp"
+    auto_pause: bool = True
+    pause_on_lock: bool = True
+    pause_on_display_sleep: bool = True
+    resume_grace_sec: int = 3
+    paused_poll_interval: int = 1
 
 
 @dataclass
@@ -109,6 +114,10 @@ class Config:
             raise ValueError("capture.interval must be >= 1")
         if self.capture.mode not in ["fullscreen", "active_window"]:
             raise ValueError("capture.mode must be 'fullscreen' or 'active_window'")
+        if self.capture.resume_grace_sec < 0:
+            raise ValueError("capture.resume_grace_sec must be >= 0")
+        if self.capture.paused_poll_interval < 1:
+            raise ValueError("capture.paused_poll_interval must be >= 1")
         if self.storage.retention_days < 1:
             raise ValueError("storage.retention_days must be >= 1")
         if self.logging.level not in ["DEBUG", "INFO", "WARNING", "ERROR"]:
@@ -167,4 +176,3 @@ def load_config(config_path: Optional[str] = None) -> Config:
     config.validate()
     
     return config
-

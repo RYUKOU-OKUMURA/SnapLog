@@ -5,6 +5,11 @@ capture:
   interval: 60                    # キャプチャ間隔（秒）
   mode: "fullscreen"              # fullscreen（MVP） / active_window（拡張）
   temp_dir: "/tmp"                # 一時ファイル保存先
+  auto_pause: true                # 画面非表示時に自動一時停止
+  pause_on_lock: true             # 画面ロック中は停止
+  pause_on_display_sleep: true    # ディスプレイスリープ中は停止
+  resume_grace_sec: 3             # 復帰後の待機秒数
+  paused_poll_interval: 1         # 一時停止中の再チェック間隔（秒）
 
 # ===== 保存先 =====
 storage:
