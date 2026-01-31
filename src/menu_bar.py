@@ -20,10 +20,10 @@ logger = logging.getLogger("snaplog.menu_bar")
 
 class SnapLogMenuBarApp(rumps.App):
     """SnapLogメニューバーアプリケーション"""
-    
+
     def __init__(self):
         super(SnapLogMenuBarApp, self).__init__("SnapLog", quit_button=None)
-        
+
         # 設定読み込み
         try:
             self.cfg = config.load_config()
@@ -31,12 +31,15 @@ class SnapLogMenuBarApp(rumps.App):
             logger.error(f"設定読み込みエラー: {e}")
             self.cfg = config.Config()
             self.cfg.expand_paths()
-        
+
+        # 前回の状態をキャッシュ（変化時のみメニュー再構築）
+        self._last_pause_state: dict = {}
+
         # メニュー項目を構築
         self.build_menu()
-        
-        # 状態更新用のタイマー
-        self.update_timer = rumps.Timer(self.update_status, 5)  # 5秒ごとに更新
+
+        # 状態更新用のタイマー（30秒ごとに更新、メモリ効率化）
+        self.update_timer = rumps.Timer(self.update_status, 30)
         self.update_timer.start()
     
     def build_menu(self):
@@ -82,8 +85,13 @@ class SnapLogMenuBarApp(rumps.App):
         self.menu.add(rumps.MenuItem("終了", callback=self.quit_app))
     
     def update_status(self, _):
-        """状態を更新"""
-        self.build_menu()
+        """状態を更新（変化時のみメニュー再構築）"""
+        current_state = main_module.get_pause_state()
+
+        # 状態が変化した場合のみメニューを再構築（メモリ効率化）
+        if current_state != self._last_pause_state:
+            self._last_pause_state = current_state.copy()
+            self.build_menu()
     
     @rumps.clicked("一時停止")
     @rumps.clicked("再開")

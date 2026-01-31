@@ -120,6 +120,10 @@ def get_frontmost_window_via_quartz() -> Optional[dict]:
     Returns:
         Optional[dict]: {"window_id": int, "app_name": str, "window_title": str, "bounds": dict} または None
     """
+    # 除外するシステムウィンドウ（定数化してメモリ効率化）
+    SYSTEM_APPS = frozenset(["Window Server", "Dock", "SystemUIServer", "Control Center"])
+
+    window_list = None
     try:
         # 画面上のウィンドウリストを取得
         window_list = Quartz.CGWindowListCopyWindowInfo(
@@ -136,35 +140,35 @@ def get_frontmost_window_via_quartz() -> Optional[dict]:
             layer = window.get(Quartz.kCGWindowLayer, 999)
 
             # レイヤー0は通常のアプリウィンドウ
-            if layer == 0:
-                window_id = window.get(Quartz.kCGWindowNumber)
-                app_name = window.get(Quartz.kCGWindowOwnerName, "")
-                window_title = window.get(Quartz.kCGWindowName, "")
-                bounds_dict = window.get(Quartz.kCGWindowBounds, {})
+            if layer != 0:
+                continue
 
-                # ウィンドウIDが有効でない場合はスキップ
-                if not window_id:
-                    continue
+            window_id = window.get(Quartz.kCGWindowNumber)
+            if not window_id:
+                continue
 
-                # 除外するシステムウィンドウ
-                if app_name in ["Window Server", "Dock", "SystemUIServer", "Control Center"]:
-                    continue
+            app_name = window.get(Quartz.kCGWindowOwnerName, "")
+            if app_name in SYSTEM_APPS:
+                continue
 
-                bounds = None
-                if bounds_dict:
-                    bounds = {
-                        "x": int(bounds_dict.get("X", 0)),
-                        "y": int(bounds_dict.get("Y", 0)),
-                        "width": int(bounds_dict.get("Width", 0)),
-                        "height": int(bounds_dict.get("Height", 0)),
-                    }
+            window_title = window.get(Quartz.kCGWindowName, "")
+            bounds_dict = window.get(Quartz.kCGWindowBounds, {})
 
-                return {
-                    "window_id": window_id,
-                    "app_name": app_name,
-                    "window_title": window_title,
-                    "bounds": bounds,
+            bounds = None
+            if bounds_dict:
+                bounds = {
+                    "x": int(bounds_dict.get("X", 0)),
+                    "y": int(bounds_dict.get("Y", 0)),
+                    "width": int(bounds_dict.get("Width", 0)),
+                    "height": int(bounds_dict.get("Height", 0)),
                 }
+
+            return {
+                "window_id": window_id,
+                "app_name": app_name,
+                "window_title": window_title,
+                "bounds": bounds,
+            }
 
         logger.debug("有効な最前面ウィンドウが見つかりません")
         return None
@@ -172,6 +176,11 @@ def get_frontmost_window_via_quartz() -> Optional[dict]:
     except Exception as e:
         logger.debug(f"Quartz APIでのウィンドウ情報取得に失敗: {e}")
         return None
+
+    finally:
+        # CoreFoundationオブジェクトの参照を解放
+        if window_list is not None:
+            del window_list
 
 
 def get_window_id() -> Optional[int]:

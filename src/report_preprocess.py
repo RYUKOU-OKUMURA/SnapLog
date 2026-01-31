@@ -4,9 +4,48 @@ import logging
 import re
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, Generator, Iterator, List, Optional
 
 logger = logging.getLogger("snaplog.report_preprocess")
+
+
+def stream_logs_by_date(
+    base_dir: str,
+    log_subdir: str,
+    target_date: str
+) -> Generator[Dict, None, None]:
+    """
+    指定日のログをストリーミング読み込み（メモリ効率版）
+
+    Args:
+        base_dir: ベースディレクトリ
+        log_subdir: ログサブディレクトリ名
+        target_date: 対象日（YYYY-MM-DD形式）
+
+    Yields:
+        Dict: ログエントリ
+    """
+    log_dir = Path(base_dir) / log_subdir
+    log_file = log_dir / f"activity_log_{target_date}.jsonl"
+
+    if not log_file.exists():
+        logger.warning(f"ログファイルが存在しません: {log_file}")
+        return
+
+    try:
+        with open(log_file, "r", encoding="utf-8") as f:
+            for line_num, line in enumerate(f, 1):
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    yield json.loads(line)
+                except json.JSONDecodeError as e:
+                    logger.warning(f"ログファイルの{line_num}行目をパースできませんでした: {e}")
+                    continue
+    except Exception as e:
+        logger.error(f"ログファイル読み込み中にエラーが発生しました: {log_file}, エラー: {e}")
+        raise
 
 
 def load_logs_by_date(
@@ -15,40 +54,17 @@ def load_logs_by_date(
     target_date: str
 ) -> List[Dict]:
     """
-    指定日のログを読み込む
-    
+    指定日のログを読み込む（リスト版、後方互換性維持）
+
     Args:
         base_dir: ベースディレクトリ
         log_subdir: ログサブディレクトリ名
         target_date: 対象日（YYYY-MM-DD形式）
-        
+
     Returns:
         List[Dict]: ログエントリのリスト
     """
-    log_dir = Path(base_dir) / log_subdir
-    log_file = log_dir / f"activity_log_{target_date}.jsonl"
-    
-    if not log_file.exists():
-        logger.warning(f"ログファイルが存在しません: {log_file}")
-        return []
-    
-    logs = []
-    try:
-        with open(log_file, "r", encoding="utf-8") as f:
-            for line_num, line in enumerate(f, 1):
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    entry = json.loads(line)
-                    logs.append(entry)
-                except json.JSONDecodeError as e:
-                    logger.warning(f"ログファイルの{line_num}行目をパースできませんでした: {e}")
-                    continue
-    except Exception as e:
-        logger.error(f"ログファイル読み込み中にエラーが発生しました: {log_file}, エラー: {e}")
-        raise
-    
+    logs = list(stream_logs_by_date(base_dir, log_subdir, target_date))
     logger.info(f"{target_date}のログを{len(logs)}件読み込みました")
     return logs
 
@@ -280,6 +296,75 @@ def split_into_chunks(
     return chunks
 
 
+def stream_preprocess_logs(
+    base_dir: str,
+    log_subdir: str,
+    target_date: str,
+    group_gap_minutes: int = 10,
+    chunk_chars: int = 12000,
+    mask_sensitive: bool = False
+) -> Generator[str, None, None]:
+    """
+    ログを前処理してLLM投入用のチャンクをストリーミング生成（メモリ効率版）
+
+    Args:
+        base_dir: ベースディレクトリ
+        log_subdir: ログサブディレクトリ名
+        target_date: 対象日（YYYY-MM-DD形式）
+        group_gap_minutes: セッション分割の閾値（分）
+        chunk_chars: LLM投入用の最大文字数
+        mask_sensitive: 個人情報をマスキングするか
+
+    Yields:
+        str: LLM投入用のチャンク
+    """
+    # 1. ログ読み込み（この部分はメモリに保持が必要、セッション分割のため）
+    logs = load_logs_by_date(base_dir, log_subdir, target_date)
+
+    if not logs:
+        logger.warning(f"{target_date}のログがありません")
+        return
+
+    # 2. セッション分割
+    sessions = split_into_sessions(logs, group_gap_minutes)
+
+    # ログリストを解放（セッション分割後は不要）
+    del logs
+
+    total_sessions = len(sessions)
+    chunk_count = 0
+
+    # 3. 各セッションを順次処理（1セッションずつメモリに保持）
+    for session_idx, session in enumerate(sessions):
+        grouped = group_by_app_and_window(session)
+
+        # セッションを解放
+        session.clear()
+
+        # 4. LLM入力用テキストに整形
+        formatted_text = format_logs_for_llm(grouped, mask_sensitive)
+
+        # グループを解放
+        del grouped
+
+        # 5. チャンク分割
+        chunks = split_into_chunks(formatted_text, chunk_chars)
+
+        # フォーマット済みテキストを解放
+        del formatted_text
+
+        # チャンクをyield
+        for chunk in chunks:
+            chunk_count += 1
+            if total_sessions > 1:
+                header = f"【セッション {session_idx + 1}/{total_sessions}】\n\n"
+                yield header + chunk
+            else:
+                yield chunk
+
+    logger.info(f"前処理完了: {chunk_count}チャンクを生成しました")
+
+
 def preprocess_logs(
     base_dir: str,
     log_subdir: str,
@@ -289,8 +374,8 @@ def preprocess_logs(
     mask_sensitive: bool = False
 ) -> List[str]:
     """
-    ログを前処理してLLM投入用のチャンクに分割
-    
+    ログを前処理してLLM投入用のチャンクに分割（リスト版、後方互換性維持）
+
     Args:
         base_dir: ベースディレクトリ
         log_subdir: ログサブディレクトリ名
@@ -298,39 +383,11 @@ def preprocess_logs(
         group_gap_minutes: セッション分割の閾値（分）
         chunk_chars: LLM投入用の最大文字数
         mask_sensitive: 個人情報をマスキングするか
-        
+
     Returns:
         List[str]: LLM投入用のチャンクリスト
     """
-    # 1. ログ読み込み
-    logs = load_logs_by_date(base_dir, log_subdir, target_date)
-    
-    if not logs:
-        logger.warning(f"{target_date}のログがありません")
-        return []
-    
-    # 2. セッション分割
-    sessions = split_into_sessions(logs, group_gap_minutes)
-    
-    # 3. 各セッションをグルーピング
-    all_chunks = []
-    
-    for session_idx, session in enumerate(sessions):
-        grouped = group_by_app_and_window(session)
-        
-        # 4. LLM入力用テキストに整形
-        formatted_text = format_logs_for_llm(grouped, mask_sensitive)
-        
-        # 5. チャンク分割
-        chunks = split_into_chunks(formatted_text, chunk_chars)
-        
-        # セッション番号を付与（複数セッションがある場合）
-        if len(sessions) > 1:
-            for i, chunk in enumerate(chunks):
-                header = f"【セッション {session_idx + 1}/{len(sessions)}】\n\n"
-                chunks[i] = header + chunk
-        
-        all_chunks.extend(chunks)
-    
-    logger.info(f"前処理完了: {len(all_chunks)}チャンクを生成しました")
-    return all_chunks
+    return list(stream_preprocess_logs(
+        base_dir, log_subdir, target_date,
+        group_gap_minutes, chunk_chars, mask_sensitive
+    ))

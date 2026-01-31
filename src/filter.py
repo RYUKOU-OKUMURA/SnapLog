@@ -1,4 +1,5 @@
 """フィルタモジュール（除外判定・重複排除・UIノイズ除去）"""
+import hashlib
 import logging
 import re
 from difflib import SequenceMatcher
@@ -9,41 +10,82 @@ from .window_info import WindowInfo
 
 logger = logging.getLogger("snaplog.filter")
 
-# 正規表現パターンのキャッシュ（モジュールレベル）
+# 正規表現パターンのキャッシュ（モジュールレベル、最大サイズ制限付き）
 _compiled_patterns_cache: dict[str, re.Pattern] = {}
+_MAX_PATTERN_CACHE_SIZE = 100  # キャッシュの最大サイズ
 
-# 前回のOCRテキストを保持（重複排除用）
-_last_ocr_text: Optional[str] = None
+# 前回のOCRテキストのハッシュを保持（重複排除用、メモリ効率化）
+# セキュリティ: SHA-256ハッシュを使用し、元テキストは保持しない
+_last_ocr_hash: Optional[str] = None
+_last_ocr_text_sample: Optional[str] = None  # 類似度計算用に先頭部分のみ保持
 _last_app_name: Optional[str] = None
+_TEXT_SAMPLE_SIZE = 2000  # 類似度計算用のサンプルサイズ
+
+
+def _compute_text_hash(text: str) -> str:
+    """
+    テキストのSHA-256ハッシュを計算（セキュアなハッシュ）
+
+    Args:
+        text: ハッシュ化するテキスト
+
+    Returns:
+        str: SHA-256ハッシュ（16進数文字列）
+    """
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def clear_sensitive_state() -> None:
+    """
+    センシティブなグローバル状態をクリア（アプリ終了時に呼び出す）
+
+    セキュリティ対策: メモリ上の機密データを明示的に削除
+    """
+    global _last_ocr_hash, _last_ocr_text_sample, _last_app_name
+
+    _last_ocr_hash = None
+    _last_ocr_text_sample = None
+    _last_app_name = None
+    logger.debug("センシティブな状態をクリアしました")
 
 
 def _compile_patterns(patterns: list[str]) -> list[re.Pattern]:
     """
-    正規表現パターンをコンパイル（キャッシュ付き）
-    
+    正規表現パターンをコンパイル（キャッシュ付き、サイズ制限あり）
+
     Args:
         patterns: 正規表現パターンのリスト
-        
+
     Returns:
         list[re.Pattern]: コンパイル済みパターンのリスト（無効なパターンは除外）
     """
+    global _compiled_patterns_cache
+
     compiled = []
-    
+
     for pattern_str in patterns:
         # キャッシュをチェック
         if pattern_str in _compiled_patterns_cache:
             compiled.append(_compiled_patterns_cache[pattern_str])
             continue
-        
+
         # パターンをコンパイル
         try:
             pattern = re.compile(pattern_str)
+
+            # キャッシュサイズ制限チェック（LRU的に古いものを削除）
+            if len(_compiled_patterns_cache) >= _MAX_PATTERN_CACHE_SIZE:
+                # 最初のキーを削除（Python 3.7+で挿入順保持）
+                first_key = next(iter(_compiled_patterns_cache))
+                del _compiled_patterns_cache[first_key]
+                logger.debug(f"パターンキャッシュから古いエントリを削除: {first_key[:50]}...")
+
             _compiled_patterns_cache[pattern_str] = pattern
             compiled.append(pattern)
         except re.error as e:
             logger.warning(f"無効な正規表現パターンをスキップしました: {pattern_str}, エラー: {e}")
             continue
-    
+
     return compiled
 
 
@@ -144,7 +186,11 @@ def is_duplicate(
     config: Config
 ) -> Tuple[bool, Optional[str]]:
     """
-    重複判定（前回のOCRテキストとの類似度チェック）
+    重複判定（前回のOCRテキストとの比較）
+
+    メモリ効率化のため、以下の2段階で判定:
+    1. ハッシュ比較（完全一致の高速判定）
+    2. サンプルテキストによる類似度計算（閾値判定）
 
     Args:
         ocr_text: 現在のOCRテキスト
@@ -154,21 +200,35 @@ def is_duplicate(
     Returns:
         Tuple[bool, Optional[str]]: (重複かどうか, 理由)
     """
-    global _last_ocr_text, _last_app_name
+    global _last_ocr_hash, _last_ocr_text_sample, _last_app_name
 
     threshold = config.filter.similarity_threshold
 
-    # 前回と同じアプリで、類似度が閾値以上なら重複
-    if _last_ocr_text and _last_app_name == app_name:
-        similarity = calculate_similarity(ocr_text, _last_ocr_text)
-        if similarity >= threshold:
-            reason = f"重複検出: 類似度 {similarity:.2%} >= {threshold:.0%}"
+    # 現在のテキストのハッシュとサンプルを計算
+    current_hash = _compute_text_hash(ocr_text)
+    current_sample = ocr_text[:_TEXT_SAMPLE_SIZE]
+
+    # 前回と同じアプリの場合のみ比較
+    if _last_ocr_hash and _last_app_name == app_name:
+        # 1. ハッシュが完全一致なら重複（高速判定）
+        if current_hash == _last_ocr_hash:
+            reason = "重複検出: 完全一致（ハッシュ）"
             if config.filter.log_exclusion_reason:
                 logger.debug(reason)
             return True, reason
 
-    # 重複でない場合は現在の状態を保存
-    _last_ocr_text = ocr_text
+        # 2. サンプルテキストで類似度を計算（メモリ効率的）
+        if _last_ocr_text_sample:
+            similarity = calculate_similarity(current_sample, _last_ocr_text_sample)
+            if similarity >= threshold:
+                reason = f"重複検出: 類似度 {similarity:.2%} >= {threshold:.0%}"
+                if config.filter.log_exclusion_reason:
+                    logger.debug(reason)
+                return True, reason
+
+    # 重複でない場合は現在の状態を保存（ハッシュとサンプルのみ）
+    _last_ocr_hash = current_hash
+    _last_ocr_text_sample = current_sample
     _last_app_name = app_name
 
     return False, None

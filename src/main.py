@@ -1,10 +1,14 @@
 """SnapLog メインエントリーポイント"""
 import argparse
+import os
 import signal
 import sys
 import time
 import logging
 import threading
+from datetime import datetime
+from pathlib import Path
+import shutil
 
 from . import config
 from . import capture
@@ -16,6 +20,10 @@ from . import screen_state
 from . import logging as logging_module
 
 logger = logging.getLogger("snaplog.main")
+
+# デバッグ用: OCRが空になる原因の切り分け
+DEBUG_OCR = os.environ.get("SNAPLOG_DEBUG_OCR") == "1"
+KEEP_EMPTY_OCR_IMAGES = os.environ.get("SNAPLOG_KEEP_EMPTY_OCR_IMAGES") == "1"
 
 # グローバル変数: 実行フラグ（SIGINTでFalseになる）
 running = True
@@ -176,6 +184,7 @@ def run_main_loop(cfg: config.Config):
 
         skip = False
         image_path = None
+        ocr_text = ""
 
         try:
             # 1. アクティブウィンドウ情報取得
@@ -207,16 +216,28 @@ def run_main_loop(cfg: config.Config):
                     skip = True
 
             # 4. OCR処理
-            ocr_text = ""
             if not skip and image_path:
                 ocr_text = ocr.extract_text(image_path)
                 logger.debug(f"OCR結果: {len(ocr_text)}文字")
+                if DEBUG_OCR and not ocr_text:
+                    logger.warning(
+                        "OCR結果が空です: app=%s title=%s",
+                        window.app_name,
+                        window.window_title,
+                    )
 
             # 5. UIノイズ除去
             if not skip and ocr_text:
                 original_len = len(ocr_text)
                 ocr_text = filter_module.remove_ui_noise(ocr_text, cfg)
                 logger.debug(f"UIノイズ除去: {original_len}文字 -> {len(ocr_text)}文字")
+                if DEBUG_OCR and original_len > 0 and not ocr_text:
+                    logger.warning(
+                        "UIノイズ除去でOCRが空になりました: app=%s title=%s original_len=%d",
+                        window.app_name,
+                        window.window_title,
+                        original_len,
+                    )
 
             # 6. 除外判定②（OCR結果）
             if not skip:
@@ -250,6 +271,16 @@ def run_main_loop(cfg: config.Config):
             logger.error(f"メインループ中に予期しないエラーが発生しました: {e}", exc_info=True)
         finally:
             if image_path:
+                if DEBUG_OCR and KEEP_EMPTY_OCR_IMAGES and not ocr_text:
+                    try:
+                        debug_dir = Path(cfg.storage.base_dir) / "debug"
+                        debug_dir.mkdir(parents=True, exist_ok=True)
+                        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        debug_path = debug_dir / f"empty_ocr_{ts}.png"
+                        shutil.copy2(image_path, debug_path)
+                        logger.warning(f"OCR空画像を保存しました: {debug_path}")
+                    except Exception as e:
+                        logger.warning(f"OCR空画像の保存に失敗しました: {e}")
                 try:
                     capture.delete_image(image_path)
                 except Exception:
@@ -257,7 +288,9 @@ def run_main_loop(cfg: config.Config):
 
         if running:
             time.sleep(cfg.capture.interval)
-        
+
+    # 終了時にセンシティブなデータをクリア（セキュリティ対策）
+    filter_module.clear_sensitive_state()
     logger.info("SnapLogを終了しました")
 
 
