@@ -30,8 +30,13 @@ def setup_logging(config: Optional[Config] = None, log_config: Optional[LoggingC
     logger = logging.getLogger("snaplog")
     logger.setLevel(log_level)
     
-    # 既存のハンドラをクリア（重複を防ぐ）
-    logger.handlers.clear()
+    # 既存のハンドラを閉じてからクリア（再初期化時のFDリークを防ぐ）
+    for handler in logger.handlers[:]:
+        logger.removeHandler(handler)
+        try:
+            handler.close()
+        except Exception:
+            pass
     
     # フォーマットを設定
     formatter = logging.Formatter(
@@ -59,7 +64,6 @@ def setup_logging(config: Optional[Config] = None, log_config: Optional[LoggingC
     logger.addHandler(file_handler)
     
     return logger
-
 
 
 

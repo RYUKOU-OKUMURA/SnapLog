@@ -1,12 +1,21 @@
 """ウィンドウ情報取得モジュール"""
+from contextlib import nullcontext
 import logging
 import subprocess
 from dataclasses import dataclass
 from typing import Optional
 
 import Quartz
+import objc
 
 logger = logging.getLogger("snaplog.window_info")
+
+
+def _objc_autorelease_pool():
+    """Objective-Cの一時オブジェクトを確実に解放するためのコンテキストを返す。"""
+    if hasattr(objc, "autorelease_pool"):
+        return objc.autorelease_pool()
+    return nullcontext()
 
 
 @dataclass
@@ -125,53 +134,54 @@ def get_frontmost_window_via_quartz() -> Optional[dict]:
 
     window_list = None
     try:
-        # 画面上のウィンドウリストを取得
-        window_list = Quartz.CGWindowListCopyWindowInfo(
-            Quartz.kCGWindowListOptionOnScreenOnly | Quartz.kCGWindowListExcludeDesktopElements,
-            Quartz.kCGNullWindowID
-        )
+        with _objc_autorelease_pool():
+            # 画面上のウィンドウリストを取得
+            window_list = Quartz.CGWindowListCopyWindowInfo(
+                Quartz.kCGWindowListOptionOnScreenOnly | Quartz.kCGWindowListExcludeDesktopElements,
+                Quartz.kCGNullWindowID
+            )
 
-        if not window_list:
-            logger.debug("ウィンドウリストの取得に失敗")
-            return None
+            if not window_list:
+                logger.debug("ウィンドウリストの取得に失敗")
+                return None
 
-        # レイヤー0（通常のウィンドウ）で最前面のものを探す
-        for window in window_list:
-            layer = window.get(Quartz.kCGWindowLayer, 999)
+            # レイヤー0（通常のウィンドウ）で最前面のものを探す
+            for window in window_list:
+                layer = window.get(Quartz.kCGWindowLayer, 999)
 
-            # レイヤー0は通常のアプリウィンドウ
-            if layer != 0:
-                continue
+                # レイヤー0は通常のアプリウィンドウ
+                if layer != 0:
+                    continue
 
-            window_id = window.get(Quartz.kCGWindowNumber)
-            if not window_id:
-                continue
+                window_id = window.get(Quartz.kCGWindowNumber)
+                if not window_id:
+                    continue
 
-            app_name = window.get(Quartz.kCGWindowOwnerName, "")
-            if app_name in SYSTEM_APPS:
-                continue
+                app_name = window.get(Quartz.kCGWindowOwnerName, "")
+                if app_name in SYSTEM_APPS:
+                    continue
 
-            window_title = window.get(Quartz.kCGWindowName, "")
-            bounds_dict = window.get(Quartz.kCGWindowBounds, {})
+                window_title = window.get(Quartz.kCGWindowName, "")
+                bounds_dict = window.get(Quartz.kCGWindowBounds, {})
 
-            bounds = None
-            if bounds_dict:
-                bounds = {
-                    "x": int(bounds_dict.get("X", 0)),
-                    "y": int(bounds_dict.get("Y", 0)),
-                    "width": int(bounds_dict.get("Width", 0)),
-                    "height": int(bounds_dict.get("Height", 0)),
+                bounds = None
+                if bounds_dict:
+                    bounds = {
+                        "x": int(bounds_dict.get("X", 0)),
+                        "y": int(bounds_dict.get("Y", 0)),
+                        "width": int(bounds_dict.get("Width", 0)),
+                        "height": int(bounds_dict.get("Height", 0)),
+                    }
+
+                return {
+                    "window_id": window_id,
+                    "app_name": app_name,
+                    "window_title": window_title,
+                    "bounds": bounds,
                 }
 
-            return {
-                "window_id": window_id,
-                "app_name": app_name,
-                "window_title": window_title,
-                "bounds": bounds,
-            }
-
-        logger.debug("有効な最前面ウィンドウが見つかりません")
-        return None
+            logger.debug("有効な最前面ウィンドウが見つかりません")
+            return None
 
     except Exception as e:
         logger.debug(f"Quartz APIでのウィンドウ情報取得に失敗: {e}")
@@ -249,5 +259,4 @@ def get_active_window(include_bounds: bool = False) -> WindowInfo:
         window_id=window_id,
         window_bounds=window_bounds
     )
-
 

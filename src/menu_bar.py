@@ -34,6 +34,9 @@ class SnapLogMenuBarApp(rumps.App):
 
         # 前回の状態をキャッシュ（変化時のみメニュー再構築）
         self._last_pause_state: dict = {}
+        # 日報生成の同時実行を防止
+        self._report_lock = threading.Lock()
+        self._report_running = False
 
         # メニュー項目を構築
         self.build_menu()
@@ -108,6 +111,12 @@ class SnapLogMenuBarApp(rumps.App):
     @rumps.clicked("今日の日報を生成")
     def generate_today_report(self, _):
         """今日の日報を生成"""
+        with self._report_lock:
+            if self._report_running:
+                rumps.notification("SnapLog", "処理中", "日報生成はすでに実行中です")
+                return
+            self._report_running = True
+
         def _progress_callback(current, total, status):
             """進捗コールバック - メニューバータイトルを更新"""
             if status == "processing":
@@ -133,6 +142,10 @@ class SnapLogMenuBarApp(rumps.App):
                 self.title = "SnapLog"
                 logger.error(f"日報生成エラー: {e}")
                 rumps.notification("SnapLog", "エラー", f"日報生成中にエラーが発生しました")
+            finally:
+                self.title = "SnapLog"
+                with self._report_lock:
+                    self._report_running = False
 
         # 別スレッドで実行（UIをブロックしない）
         thread = threading.Thread(target=_generate)
