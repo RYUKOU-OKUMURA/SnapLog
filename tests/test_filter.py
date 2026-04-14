@@ -2,7 +2,12 @@
 import pytest
 
 from src.config import Config, FilterConfig
-from src.filter import should_exclude_pre_capture, should_exclude_post_capture
+from src.filter import (
+    should_exclude_pre_capture,
+    should_exclude_post_capture,
+    is_duplicate,
+    clear_sensitive_state,
+)
 from src.window_info import WindowInfo
 
 
@@ -152,6 +157,26 @@ def test_empty_app_name():
     window = WindowInfo(app_name="", window_title="Some Title")
     should_exclude, reason = should_exclude_pre_capture(window, config)
     assert should_exclude is False
+
+
+def test_duplicate_empty_ocr_not_suppressed():
+    """OCRが空のまま同一アプリでも重複排除でログが止まらないこと"""
+    clear_sensitive_state()
+    config = Config()
+    app = "TestApp"
+    assert is_duplicate("", app, config)[0] is False
+    assert is_duplicate("", app, config)[0] is False
+    assert is_duplicate("", app, config)[0] is False
+
+
+def test_duplicate_identical_text_still_suppressed():
+    """通常の同一テキストは重複として抑止されること"""
+    clear_sensitive_state()
+    config = Config()
+    app = "TestApp"
+    text = "unchanged screen content"
+    assert is_duplicate(text, app, config)[0] is False
+    assert is_duplicate(text, app, config)[0] is True
 
 
 def test_empty_window_title():

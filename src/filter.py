@@ -212,10 +212,12 @@ def is_duplicate(
     if _last_ocr_hash and _last_app_name == app_name:
         # 1. ハッシュが完全一致なら重複（高速判定）
         if current_hash == _last_ocr_hash:
-            reason = "重複検出: 完全一致（ハッシュ）"
-            if config.filter.log_exclusion_reason:
-                logger.debug(reason)
-            return True, reason
+            # OCRが空のときはハッシュ一致でも重複とみなさない（Vision失敗などでログが途切れるのを防ぐ）
+            if ocr_text.strip():
+                reason = "重複検出: 完全一致（ハッシュ）"
+                if config.filter.log_exclusion_reason:
+                    logger.debug(reason)
+                return True, reason
 
         # 2. サンプルテキストで類似度を計算（メモリ効率的）
         if _last_ocr_text_sample:
