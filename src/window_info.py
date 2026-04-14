@@ -5,15 +5,19 @@ import subprocess
 from dataclasses import dataclass
 from typing import Optional
 
-import Quartz
-import objc
+try:
+    import Quartz
+    import objc
+except ImportError:
+    Quartz = None
+    objc = None
 
 logger = logging.getLogger("snaplog.window_info")
 
 
 def _objc_autorelease_pool():
     """Objective-Cの一時オブジェクトを確実に解放するためのコンテキストを返す。"""
-    if hasattr(objc, "autorelease_pool"):
+    if objc is not None and hasattr(objc, "autorelease_pool"):
         return objc.autorelease_pool()
     return nullcontext()
 
@@ -132,6 +136,10 @@ def get_frontmost_window_via_quartz() -> Optional[dict]:
     # 除外するシステムウィンドウ（定数化してメモリ効率化）
     SYSTEM_APPS = frozenset(["Window Server", "Dock", "SystemUIServer", "Control Center"])
 
+    if Quartz is None:
+        logger.debug("Quartz Frameworkが利用できないため、ウィンドウID取得をスキップします")
+        return None
+
     window_list = None
     try:
         with _objc_autorelease_pool():
@@ -234,14 +242,14 @@ def get_active_window(include_bounds: bool = False) -> WindowInfo:
     quartz_app_name = ""
     quartz_title = ""
 
-    # Quartz APIで情報を取得（ウィンドウID取得に信頼性が高い）
-    if include_bounds:
-        quartz_info = get_frontmost_window_via_quartz()
-        if quartz_info:
+    # Quartz APIで情報を取得（AppleScript失敗時のフォールバックにも使う）
+    quartz_info = get_frontmost_window_via_quartz()
+    if quartz_info:
+        quartz_app_name = quartz_info.get("app_name", "")
+        quartz_title = quartz_info.get("window_title", "")
+        if include_bounds:
             window_id = quartz_info.get("window_id")
             window_bounds = quartz_info.get("bounds")
-            quartz_app_name = quartz_info.get("app_name", "")
-            quartz_title = quartz_info.get("window_title", "")
 
     # AppleScriptでも情報を取得（ウィンドウタイトルが詳細に取れることがある）
     applescript_app_name = get_active_app_name()
@@ -259,4 +267,3 @@ def get_active_window(include_bounds: bool = False) -> WindowInfo:
         window_id=window_id,
         window_bounds=window_bounds
     )
-

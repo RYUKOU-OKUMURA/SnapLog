@@ -1,5 +1,6 @@
 """ストレージモジュールのテスト"""
 import json
+import logging
 import os
 import tempfile
 from datetime import datetime, timedelta
@@ -131,6 +132,25 @@ def test_save_log_date_format():
         assert today in log_file.name
 
 
+def test_save_log_emits_info_log(caplog):
+    """save_log成功時に可観測なINFOログを出すテスト"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        window = WindowInfo(
+            app_name="Cursor",
+            window_title="build_app.sh — SnapLog"
+        )
+
+        with caplog.at_level(logging.INFO, logger="snaplog"):
+            save_log(window, "hello world", tmpdir, "logs")
+
+        assert any(
+            "活動ログを保存しました:" in record.message and
+            "app=Cursor" in record.message and
+            "ocr_length=11" in record.message
+            for record in caplog.records
+        )
+
+
 def test_ensure_directories():
     """ディレクトリ作成のテスト"""
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -250,4 +270,3 @@ def test_save_log_creates_directories():
         # ディレクトリが作成されていることを確認
         assert log_dir.exists()
         assert log_dir.is_dir()
-

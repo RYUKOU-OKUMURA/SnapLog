@@ -99,6 +99,9 @@ def test_load_config_no_file():
     # デフォルト値が使用されることを確認
     assert config.capture.interval == 60
     assert config.storage.retention_days == 14
+    assert config.loaded_config_path is None
+    assert config.config_source == "defaults"
+    assert "組み込みデフォルト設定" in config.config_warning
 
 
 def test_load_config_with_file():
@@ -178,3 +181,16 @@ def test_load_config_partial():
         assert config.storage.retention_days == 14
         assert config.logging.level == "INFO"
 
+
+def test_load_config_missing_env_falls_back_to_default_file(monkeypatch):
+    """SNAPLOG_CONFIG が壊れている場合はデフォルト設定ファイルにフォールバックする"""
+    project_root = Path(__file__).parent.parent
+    default_config_file = project_root / "config" / "settings.yaml"
+
+    monkeypatch.setenv("SNAPLOG_CONFIG", "/nonexistent/path/settings.yaml")
+
+    config = load_config()
+
+    assert config.loaded_config_path == str(default_config_file)
+    assert config.config_source == "default_file_fallback"
+    assert "SNAPLOG_CONFIG" in config.config_warning

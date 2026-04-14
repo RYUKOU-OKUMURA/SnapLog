@@ -81,6 +81,8 @@ class SnapLogMenuBarApp(rumps.App):
 
         # 設定を開く
         self.menu.add(rumps.MenuItem("設定を開く", callback=self.open_settings))
+        self.menu.add(rumps.MenuItem("画面収録の設定を開く", callback=self.open_screen_recording_settings))
+        self.menu.add(rumps.MenuItem("アクセシビリティの設定を開く", callback=self.open_accessibility_settings))
 
         self.menu.add(rumps.separator)
 
@@ -169,12 +171,26 @@ class SnapLogMenuBarApp(rumps.App):
     @rumps.clicked("設定を開く")
     def open_settings(self, _):
         """設定ファイルを開く"""
-        import os
-        config_path = os.environ.get('SNAPLOG_CONFIG')
+        config_path = self.cfg.loaded_config_path or self.cfg.requested_config_path
         if config_path is None:
-            # デフォルトパス
             config_path = Path(__file__).parent.parent / "config" / "settings.yaml"
         subprocess.run(["open", str(config_path)])
+
+    @rumps.clicked("画面収録の設定を開く")
+    def open_screen_recording_settings(self, _):
+        """画面収録の設定画面を開く"""
+        subprocess.run([
+            "open",
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture",
+        ])
+
+    @rumps.clicked("アクセシビリティの設定を開く")
+    def open_accessibility_settings(self, _):
+        """アクセシビリティの設定画面を開く"""
+        subprocess.run([
+            "open",
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
+        ])
 
     @rumps.clicked("終了")
     def quit_app(self, _):

@@ -99,19 +99,17 @@ cd dist
 zip -r snaplog-$(date +%Y%m%d).zip snaplog-$(date +%Y%m%d)
 ```
 
-### 3. macOSアプリ化（オプション）
+### 3. macOSアプリ化
 
-PyInstallerを使用してアプリバンドルを作成：
+py2app を使用してメニューバーアプリを作成：
 
 ```bash
-pip install pyinstaller
-
-# メニューバーUI付きアプリを作成
-pyinstaller --onefile --windowed --name=SnapLog \
-  --icon=icon.icns \
-  --add-data "config:config" \
-  run_snaplog.py
+./scripts/build_app.sh
 ```
+
+- 出力先: `dist/SnapLog.app`
+- 初回起動時、ユーザー設定は `~/Library/Application Support/SnapLog/settings.yaml` に自動作成されます
+- `setup.py` は `config/settings.yaml` があればそれを、なければ `config/settings.yaml.example` をバンドルします
 
 ### 4. インストーラー作成（オプション）
 

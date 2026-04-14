@@ -3,8 +3,41 @@
 SnapLog.app 用エントリーポイント
 メニューバーモードで自動起動
 """
-import sys
 import os
+from pathlib import Path
+import shutil
+import sys
+
+
+APP_SUPPORT_DIR = Path.home() / "Library" / "Application Support" / "SnapLog"
+
+
+def _resolve_resources_dir() -> Path:
+    """バンドル内 Resources ディレクトリを返す。"""
+    bundle_dir = Path(sys.executable).resolve().parent
+    return (bundle_dir / ".." / "Resources").resolve()
+
+
+def ensure_user_config(resources_dir: Path) -> Path:
+    """ユーザー設定ファイルを Application Support に配置する。"""
+    APP_SUPPORT_DIR.mkdir(parents=True, exist_ok=True)
+
+    user_config_path = APP_SUPPORT_DIR / "settings.yaml"
+    if user_config_path.exists():
+        return user_config_path
+
+    bundle_candidates = [
+        resources_dir / "config" / "settings.yaml",
+        resources_dir / "config" / "settings.yaml.example",
+    ]
+    source_path = next((path for path in bundle_candidates if path.exists()), None)
+    if source_path is None:
+        raise FileNotFoundError(
+            f"バンドル内に設定テンプレートが見つかりません: {resources_dir / 'config'}"
+        )
+
+    shutil.copy2(source_path, user_config_path)
+    return user_config_path
 
 
 def setup_bundle_environment():
@@ -14,13 +47,12 @@ def setup_bundle_environment():
     """
     if getattr(sys, 'frozen', False):
         # py2app でバンドルされた場合
-        bundle_dir = os.path.dirname(sys.executable)
-        resources_dir = os.path.abspath(os.path.join(bundle_dir, '..', 'Resources'))
+        resources_dir = _resolve_resources_dir()
+        user_config_path = ensure_user_config(resources_dir)
 
-        # 設定ファイルのパスをバンドル内に設定
-        config_path = os.path.join(resources_dir, 'config', 'settings.yaml')
-        if os.path.exists(config_path):
-            os.environ['SNAPLOG_CONFIG'] = config_path
+        # 設定ファイルのパスをユーザー領域に設定
+        os.environ['SNAPLOG_CONFIG'] = str(user_config_path)
+        os.environ['SNAPLOG_APP_SUPPORT_DIR'] = str(APP_SUPPORT_DIR)
 
 
 def main():

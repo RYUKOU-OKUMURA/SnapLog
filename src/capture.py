@@ -4,10 +4,93 @@ import os
 import subprocess
 import tempfile
 from datetime import datetime
-from pathlib import Path
 from typing import Optional
 
+try:
+    import Quartz
+except ImportError:  # pragma: no cover - macOS依存
+    Quartz = None
+
 logger = logging.getLogger("snaplog.capture")
+SCREEN_RECORDING_SETTINGS_URL = (
+    "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"
+)
+_screen_recording_settings_opened = False
+
+
+def is_permission_related_capture_error(error_msg: str) -> bool:
+    """screencapture のエラーメッセージが権限起因かどうかを判定する。"""
+    normalized = (error_msg or "").lower()
+    indicators = (
+        "not allowed",
+        "permission",
+        "could not create image from display",
+    )
+    return any(indicator in normalized for indicator in indicators)
+
+
+def has_screen_recording_permission() -> Optional[bool]:
+    """画面収録権限の現在状態を返す。未判定時はNone。"""
+    if Quartz is None or not hasattr(Quartz, "CGPreflightScreenCaptureAccess"):
+        return None
+
+    try:
+        return bool(Quartz.CGPreflightScreenCaptureAccess())
+    except Exception as e:
+        logger.debug(f"画面収録権限の事前確認に失敗しました: {e}")
+        return None
+
+
+def open_screen_recording_settings() -> bool:
+    """画面収録の設定画面を一度だけ開く。"""
+    global _screen_recording_settings_opened
+
+    if _screen_recording_settings_opened:
+        return False
+
+    try:
+        subprocess.run(
+            ["open", SCREEN_RECORDING_SETTINGS_URL],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=5,
+        )
+        _screen_recording_settings_opened = True
+        logger.info("画面収録の設定画面を開きました。SnapLog.app を許可してください。")
+        return True
+    except Exception as e:
+        logger.warning(f"画面収録の設定画面を開けませんでした: {e}")
+        return False
+
+
+def request_screen_recording_permission(open_settings_on_failure: bool = True) -> Optional[bool]:
+    """画面収録権限を要求する。利用不可時はNone。"""
+    current = has_screen_recording_permission()
+    if current is True:
+        return True
+
+    if Quartz is None or not hasattr(Quartz, "CGRequestScreenCaptureAccess"):
+        return current
+
+    try:
+        granted = bool(Quartz.CGRequestScreenCaptureAccess())
+    except Exception as e:
+        logger.warning(f"画面収録権限の要求に失敗しました: {e}")
+        return current
+
+    if granted:
+        logger.info("画面収録権限が許可されました。")
+        return True
+
+    logger.warning(
+        "画面収録権限が未許可です。"
+        "システム設定 > プライバシーとセキュリティ > 画面収録 で"
+        " SnapLog.app を許可してください。"
+    )
+    if open_settings_on_failure:
+        open_screen_recording_settings()
+    return False
 
 
 def generate_temp_filename(temp_dir: str, suffix: str = ".png") -> str:
@@ -76,12 +159,13 @@ def take_screenshot(
             logger.error(f"スクリーンショット撮影失敗: {error_msg}")
             
             # 権限エラーの可能性をチェック
-            if "not allowed" in error_msg.lower() or "permission" in error_msg.lower():
+            if is_permission_related_capture_error(error_msg):
                 logger.error(
                     "画面収録権限が必要です。"
                     "システム設定 > プライバシーとセキュリティ > 画面収録 で"
-                    "Terminalまたは実行アプリを許可してください。"
+                    "SnapLog.app または実行元の Terminal / Python を許可してください。"
                 )
+                open_screen_recording_settings()
             
             # ファイルが作成されていても削除
             if os.path.exists(output_path):
@@ -144,5 +228,3 @@ def delete_image(image_path: str) -> bool:
     except Exception as e:
         logger.warning(f"画像ファイル削除失敗: {image_path}, エラー: {e}")
         return False
-
-

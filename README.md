@@ -95,6 +95,20 @@ python -m src.main
 ./scripts/start.sh
 ```
 
+### 4.1 デスクトップアプリとして使う
+
+```bash
+# .app をビルド
+./scripts/build_app.sh
+```
+
+ビルド後のアプリは `dist/SnapLog.app` に出力されます。
+
+- 初回起動時、設定ファイルは `~/Library/Application Support/SnapLog/settings.yaml` に自動作成されます
+- メニューバーの「設定を開く」はこのユーザー設定ファイルを開きます
+- 画面収録とアクセシビリティの権限は、`SnapLog.app` 自体に付与してください
+- 既存の `/Applications/SnapLog.app` を使い続ける場合は、再ビルドした `.app` で置き換える必要があります
+
 ### 5. 日報生成（Phase 2）
 
 ```bash
@@ -319,6 +333,10 @@ Error: Connection refused to localhost:1234
 ### launchd等の自動起動で権限が効かない
 
 → 画面収録/アクセシビリティは「どのアプリから実行したか」に依存します。Terminalで許可しても、launchd配下の実行では別扱いになる場合があります。まずは `./scripts/start.sh`（Terminal起動）で動作確認し、安定した自動起動は `snaplog-architecture.md` の起動・停止方針に従ってください。
+
+### デスクトップアプリ版の設定はどこにある？
+
+→ `SnapLog.app` は `~/Library/Application Support/SnapLog/settings.yaml` を使います。`.app` バンドル内の `config/settings.yaml` を直接編集しても、次回ビルドや差し替えで消えるので推奨しません。
 
 ---
 

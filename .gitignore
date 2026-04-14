@@ -21,6 +21,7 @@ build/
 
 # プロジェクト固有
 .pid
+.snaplog_launch.log
 *.log
 logs/
 reports/

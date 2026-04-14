@@ -11,6 +11,14 @@ from .window_info import WindowInfo
 logger = logging.getLogger("snaplog.storage")
 
 
+def _summarize_window_title(window_title: str, max_length: int = 80) -> str:
+    """ログ出力向けにウィンドウタイトルを短く整形する。"""
+    normalized = " ".join(window_title.split())
+    if len(normalized) <= max_length:
+        return normalized
+    return normalized[: max_length - 1] + "…"
+
+
 def cleanup_old_files(
     base_dir: str,
     log_subdir: str = "logs",
@@ -135,11 +143,16 @@ def save_log(
         with open(log_file_path, "a", encoding="utf-8", newline="\n") as f:
             json_line = json.dumps(log_entry, ensure_ascii=False)
             f.write(json_line + "\n")
-        
-        logger.debug(f"ログを保存しました: {log_file_path}")
+
+        logger.info(
+            "活動ログを保存しました: file=%s app=%s title=%s ocr_length=%d",
+            log_file_path,
+            window_info.app_name,
+            _summarize_window_title(window_info.window_title),
+            len(ocr_text),
+        )
         
     except Exception as e:
         logger.error(f"ログ保存中にエラーが発生しました: {e}")
         raise
-
 

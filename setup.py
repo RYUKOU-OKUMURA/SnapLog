@@ -2,13 +2,22 @@
 py2app setup script for SnapLog
 macOS メニューバーアプリとしてパッケージング
 """
+from pathlib import Path
+
 from setuptools import setup
+
+from src import __version__
 
 APP = ['run_snaplog_app.py']
 
-DATA_FILES = [
-    ('config', ['config/settings.yaml']),
-]
+config_files = []
+for candidate in ['config/settings.yaml', 'config/settings.yaml.example']:
+    if Path(candidate).exists():
+        config_files.append(candidate)
+
+DATA_FILES = []
+if config_files:
+    DATA_FILES.append(('config', config_files))
 
 OPTIONS = {
     'argv_emulation': False,  # rumps と競合するため無効化
@@ -16,8 +25,8 @@ OPTIONS = {
         'CFBundleName': 'SnapLog',
         'CFBundleDisplayName': 'SnapLog',
         'CFBundleIdentifier': 'com.user.snaplog',
-        'CFBundleVersion': '0.3.0',
-        'CFBundleShortVersionString': '0.3.0',
+        'CFBundleVersion': __version__,
+        'CFBundleShortVersionString': __version__,
         'LSUIElement': True,  # Dock に表示しない（メニューバーアプリ用）
         'NSHighResolutionCapable': True,
         'NSScreenCaptureUsageDescription':

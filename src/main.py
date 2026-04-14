@@ -1,5 +1,6 @@
 """SnapLog メインエントリーポイント"""
 import argparse
+import fcntl
 import os
 import signal
 import sys
@@ -35,6 +36,78 @@ auto_paused = False
 resume_block_until = None
 # グローバル変数: 自動一時停止の理由
 auto_pause_reason = ""
+empty_ocr_streak = 0
+_instance_lock_handle = None
+
+
+def _bootstrap_log(message: str, level: str = "INFO") -> None:
+    """ロギング初期化前でも stderr に起動情報を残す。"""
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    try:
+        sys.stderr.write(f"{timestamp} - snaplog.bootstrap - {level} - {message}\n")
+        sys.stderr.flush()
+    except Exception:
+        pass
+
+
+def acquire_instance_lock(cfg: config.Config) -> Path:
+    """複数インスタンスの同時起動を防止する。"""
+    global _instance_lock_handle
+
+    if _instance_lock_handle is not None:
+        return Path(_instance_lock_handle.name)
+
+    lock_path = Path(os.environ.get("SNAPLOG_LOCK_FILE", "/tmp/snaplog.lock"))
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    handle = open(lock_path, "a+", encoding="utf-8")
+
+    try:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        handle.seek(0)
+        lock_info = handle.read().strip()
+        handle.close()
+        if not lock_info:
+            lock_info = "lock held by another process"
+        raise RuntimeError(f"別の SnapLog インスタンスが実行中です: {lock_info}")
+
+    handle.seek(0)
+    handle.truncate()
+    handle.write(
+        "\n".join(
+            [
+                f"pid={os.getpid()}",
+                f"config={cfg.loaded_config_path or 'defaults'}",
+                f"log_file={cfg.logging.file}",
+                f"log_dir={cfg.storage.base_dir}/{cfg.storage.log_subdir}",
+            ]
+        )
+        + "\n"
+    )
+    handle.flush()
+
+    _instance_lock_handle = handle
+    return lock_path
+
+
+def release_instance_lock() -> None:
+    """保持中のインスタンスロックを解放する。"""
+    global _instance_lock_handle
+
+    if _instance_lock_handle is None:
+        return
+
+    try:
+        fcntl.flock(_instance_lock_handle.fileno(), fcntl.LOCK_UN)
+    except Exception:
+        pass
+
+    try:
+        _instance_lock_handle.close()
+    except Exception:
+        pass
+
+    _instance_lock_handle = None
 
 
 def toggle_pause():
@@ -145,7 +218,7 @@ def update_auto_pause_state(cfg: config.Config) -> None:
 
 def run_main_loop(cfg: config.Config):
     """メインループを実行"""
-    global running
+    global empty_ocr_streak, running
     
     # 起動時クリーンアップ
     if cfg.storage.cleanup_on_start:
@@ -239,6 +312,24 @@ def run_main_loop(cfg: config.Config):
                         original_len,
                     )
 
+            # 5.5 OCR空判定
+            if not skip and not ocr_text.strip():
+                empty_ocr_streak += 1
+                logger.warning(
+                    "OCR結果が空のため保存をスキップします: app=%s title=%s streak=%s",
+                    window.app_name,
+                    window.window_title,
+                    empty_ocr_streak,
+                )
+                if empty_ocr_streak in (3, 10):
+                    logger.warning(
+                        "OCR空が連続しています。SnapLog.app の画面収録権限とアクセシビリティ権限、"
+                        "および表示中の画面内容を確認してください。"
+                    )
+                skip = True
+            elif not skip:
+                empty_ocr_streak = 0
+
             # 6. 除外判定②（OCR結果）
             if not skip:
                 should_exclude, reason = filter_module.should_exclude_post_capture(ocr_text, cfg)
@@ -312,13 +403,42 @@ def main():
     args = parser.parse_args()
     
     try:
+        requested_config = args.config or os.environ.get("SNAPLOG_CONFIG")
+        if requested_config:
+            _bootstrap_log(f"起動開始: requested_config={requested_config}")
+        else:
+            _bootstrap_log("起動開始: requested_config=<default>")
+
         # 設定読み込み
         cfg = config.load_config(args.config)
-        logger.info("設定ファイルを読み込みました")
         
         # ロギング初期化
         logging_module.setup_logging(cfg)
+        lock_path = acquire_instance_lock(cfg)
         logger.info("SnapLogを起動しました")
+        logger.info("設定ファイル: %s", cfg.loaded_config_path or "組み込みデフォルト")
+        if cfg.config_warning:
+            logger.warning(cfg.config_warning)
+        logger.info("設定ソース: %s", cfg.config_source)
+        logger.info("アプリログ保存先: %s", cfg.logging.file)
+        logger.info("活動ログ保存先: %s/%s", cfg.storage.base_dir, cfg.storage.log_subdir)
+        logger.info("インスタンスロック: %s", lock_path)
+
+        screen_recording_permission = capture.has_screen_recording_permission()
+        if screen_recording_permission is True:
+            logger.info("画面収録権限: 許可済み")
+        elif screen_recording_permission is False:
+            logger.warning("画面収録権限: 未許可。権限要求を開始します。")
+            requested_permission = capture.request_screen_recording_permission(
+                open_settings_on_failure=True
+            )
+            if requested_permission is False:
+                logger.warning(
+                    "画面収録権限が有効になるまでキャプチャは失敗します。"
+                    "SnapLog.app を許可した後に再起動してください。"
+                )
+        else:
+            logger.info("画面収録権限: 事前確認不可。初回キャプチャで確認します。")
         
         # メニューバーUIモード
         if args.menu_bar:
@@ -337,8 +457,11 @@ def main():
             run_main_loop(cfg)
         
     except Exception as e:
+        _bootstrap_log(f"起動中にエラーが発生しました: {e}", level="ERROR")
         logger.error(f"起動中にエラーが発生しました: {e}", exc_info=True)
         sys.exit(1)
+    finally:
+        release_instance_lock()
 
 
 if __name__ == "__main__":

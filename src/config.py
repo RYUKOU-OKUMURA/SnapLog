@@ -101,6 +101,10 @@ class Config:
     llm: LLMConfig = field(default_factory=LLMConfig)
     report: ReportConfig = field(default_factory=ReportConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
+    loaded_config_path: Optional[str] = field(default=None, init=False, repr=False)
+    requested_config_path: Optional[str] = field(default=None, init=False, repr=False)
+    config_source: str = field(default="defaults", init=False, repr=False)
+    config_warning: Optional[str] = field(default=None, init=False, repr=False)
 
     def expand_paths(self) -> None:
         """パス内の`~`を展開"""
@@ -137,26 +141,45 @@ def load_config(config_path: Optional[str] = None) -> Config:
     project_root = Path(__file__).parent.parent
     default_config_path = project_root / "config" / "settings.yaml"
 
+    requested_config_path = config_path
+    config_source = "explicit"
+
     if config_path is None:
         # 環境変数からパスを取得（.app バンドル用）
         config_path = os.environ.get('SNAPLOG_CONFIG')
+        if config_path is not None:
+            config_source = "env"
 
     if config_path is None:
         # デフォルトパス: config/settings.yaml
         config_path = default_config_path
-    
+        config_source = "default_file"
+
     config_path = Path(config_path)
-    
+    config_warning = None
+    requested_path_str = str(config_path)
+
     # 設定ファイルが存在しない場合はフォールバック
     if not config_path.exists():
         env_config_path = os.environ.get('SNAPLOG_CONFIG')
         if env_config_path and Path(env_config_path) == config_path and default_config_path.exists():
+            config_warning = (
+                f"環境変数 SNAPLOG_CONFIG の設定ファイルが見つからないため、"
+                f"デフォルト設定ファイルを使用します: {config_path}"
+            )
             config_path = default_config_path
+            config_source = "default_file_fallback"
         else:
             config = Config()
             config.expand_paths()
+            config.requested_config_path = requested_path_str
+            config.loaded_config_path = None
+            config.config_source = "defaults"
+            config.config_warning = (
+                f"設定ファイルが見つからないため、組み込みデフォルト設定を使用します: {config_path}"
+            )
             return config
-    
+
     # YAMLファイルを読み込み
     with open(config_path, "r", encoding="utf-8") as f:
         yaml_data = yaml.safe_load(f) or {}
@@ -170,9 +193,13 @@ def load_config(config_path: Optional[str] = None) -> Config:
         report=ReportConfig(**yaml_data.get("report", {})),
         logging=LoggingConfig(**yaml_data.get("logging", {})),
     )
-    
+
     # パス展開とバリデーション
     config.expand_paths()
     config.validate()
-    
+    config.requested_config_path = requested_config_path or requested_path_str
+    config.loaded_config_path = str(config_path)
+    config.config_source = config_source
+    config.config_warning = config_warning
+
     return config

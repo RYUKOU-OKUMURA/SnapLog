@@ -51,21 +51,19 @@ def setup_logging(config: Optional[Config] = None, log_config: Optional[LoggingC
     logger.addHandler(console_handler)
     
     # ファイルハンドラ
-    log_file_path = os.path.expanduser(log_config.file)
-    log_file_dir = Path(log_file_path).parent
-    
+    log_file_path = Path(os.path.expanduser(log_config.file))
+    log_file_dir = log_file_path.parent
+
     # ログディレクトリが存在しない場合は作成
     if log_file_dir and not log_file_dir.exists():
         log_file_dir.mkdir(parents=True, exist_ok=True)
-    
+
     file_handler = logging.FileHandler(log_file_path, encoding="utf-8")
     file_handler.setLevel(log_level)
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
-    
+
     return logger
-
-
 
 
 
